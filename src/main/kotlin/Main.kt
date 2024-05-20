@@ -1,4 +1,3 @@
-import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -24,8 +23,17 @@ import androidx.compose.ui.window.*
 import kotlin.math.pow
 import kotlin.math.sqrt
 
+fun findInMap(dict: MutableMap<Int, Pair<Float, Float>>, circleRadius: Dp, offset: Offset): Int? {
+    for ((key, value) in dict) {
+        val distance = sqrt(((offset.x) - value.first).pow(2) + ((offset.y) - value.second).pow(2))
+        if (distance <= circleRadius.value) {
+            return key
+        }
+    }
+    return null
+}
+
 @Composable
-@Preview
 fun app() {
     val windowState = rememberWindowState()
     val density = LocalDensity.current
@@ -33,18 +41,18 @@ fun app() {
     var windowWidth by remember { mutableStateOf(windowState.size.width) }
     var windowHeight by remember { mutableStateOf(windowState.size.height) }
 
-    var circles by remember { mutableStateOf(listOf<Pair<Float, Float>>()) }
-    var lines by remember { mutableStateOf(listOf<Pair<Pair<Float, Float>, Pair<Float, Float>>>()) }
-    var selectedCircle by remember { mutableStateOf<Pair<Float, Float>?>(null) }
-    var selectedCircleToMove by remember { mutableStateOf<Pair<Float, Float>?>(null) }
-    var startConnectingPoint by remember { mutableStateOf<Pair<Float, Float>?>(null) }
-    var endConnectingPoint by remember { mutableStateOf<Pair<Float, Float>?>(null) }
+    var circles by remember { mutableStateOf(mutableMapOf<Int, Pair<Float, Float>>()) }
+    var lines by remember { mutableStateOf(mutableMapOf<Pair<Int, Int>, Pair<Pair<Float, Float>, Pair<Float, Float>>>()) }
+
+    var selectedCircle by remember { mutableStateOf<Int?>(null) }
+    var selectedCircleToMove by remember { mutableStateOf<Int?>(null) }
+    var startConnectingPoint by remember { mutableStateOf<Int?>(null) }
+    var endConnectingPoint by remember { mutableStateOf<Int?>(null) }
     val circleRadius: Dp = 20.dp
 
     var selectedOption by remember { mutableStateOf("Создать узлы") }
     var nodeCounter by remember { mutableStateOf(0) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
-
     Column {
         Row(
             modifier = Modifier
@@ -76,44 +84,42 @@ fun app() {
             )
             Text("Редактировать")
         }
-
         Box(modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
             .pointerInput(Unit) {
                 detectTapGestures(onTap = { offset ->
-                    if (selectedOption == "Создать узлы") {
-                        circles += Pair(offset.x, offset.y)
-                        nodeCounter += 1
-                    } else if (selectedOption == "Редактировать") {
-                        val hitCircle = circles.find { (x, y) ->
-                            val distance = sqrt(((offset.x) - x).pow(2) + ((offset.y) - y).pow(2))
-                            distance <= circleRadius.value
+                    when (selectedOption) {
+                        "Создать узлы" -> {
+                            circles = circles.toMutableMap().apply { this[nodeCounter] = Pair(offset.x, offset.y) }
+                            nodeCounter += 1
                         }
-                        selectedCircle = hitCircle
-                    } else if (selectedOption == "Перемещение") {
-                        val hitCircle = circles.find { (x, y) ->
-                            val distance = sqrt(((offset.x) - x).pow(2) + ((offset.y) - y).pow(2))
-                            distance <= circleRadius.value
-                        }
-                        selectedCircleToMove = hitCircle
-                    } else if (selectedOption == "Соединить узлы") {
-                        val hitCircle = circles.find { (x, y) ->
-                            val distance = sqrt(((offset.x) - x).pow(2) + ((offset.y) - y).pow(2))
-                            distance <= circleRadius.value
-                        }
-                        if (hitCircle != null) {
-                            if (startConnectingPoint == null) {
-                                startConnectingPoint = hitCircle
-                            } else if (endConnectingPoint == null && startConnectingPoint != hitCircle) {
-                                endConnectingPoint = hitCircle
-                                lines += Pair(startConnectingPoint!!, endConnectingPoint!!)
-                                startConnectingPoint = null
-                                endConnectingPoint = null
-                            } else {
-                                startConnectingPoint = null
-                                endConnectingPoint = null
+                        "Соединить узлы" -> {
+                            val hitCircle = findInMap(circles, circleRadius, offset)
+                            if (hitCircle != null) {
+                                if (startConnectingPoint == null) {
+                                    startConnectingPoint = hitCircle
+                                } else if (endConnectingPoint == null && startConnectingPoint != hitCircle) {
+                                    endConnectingPoint = hitCircle
+                                    lines = lines.toMutableMap().apply {
+                                        this[Pair(startConnectingPoint!!, endConnectingPoint!!)] = Pair(circles[startConnectingPoint]!!, circles[endConnectingPoint]!!)
+                                    }
+                                    startConnectingPoint = null
+                                    endConnectingPoint = null
+                                } else {
+                                    startConnectingPoint = null
+                                    endConnectingPoint = null
+                                }
                             }
+                        }
+
+
+                        "Редактировать" -> {
+                            selectedCircle = findInMap(circles, circleRadius, offset)
+                        }
+
+                        "Перемещение" -> {
+                            selectedCircleToMove = findInMap(circles, circleRadius, offset)
                         }
                     }
                 })
@@ -125,37 +131,37 @@ fun app() {
                     windowHeight = with(density) { newSize.height.toDp() }
                 }
             }
-            .pointerInput(Unit){
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        val hitCircle = circles.find { (x, y) ->
-                            val distance = sqrt(((offset.x) - x).pow(2) + ((offset.y) - y).pow(2))
-                            distance <= circleRadius.value
-                        }
-                        selectedCircleToMove = hitCircle
-                    },
-                    onDragEnd = {
-                        selectedCircleToMove = null
-                    },
-                    onDragCancel = {
-                        selectedCircleToMove = null
-                    },
-                    onDrag = { change, dragAmount ->
-                        if (selectedCircleToMove != null && selectedOption == "Перемещение") {
-                            print(selectedCircleToMove)
-                            print(Pair(dragAmount.x, dragAmount.y))
-                            val newX = selectedCircleToMove!!.first + dragAmount.x
-                            val newY = selectedCircleToMove!!.second + dragAmount.y
-                            circles = circles.map { if (it == selectedCircleToMove) {Pair(newX, newY)} else {it} }
-                            println(circles)
-                            lines = lines.map { (start, end) ->
-                                if (start == selectedCircleToMove) Pair(Pair(newX, newY), end) else if (end == selectedCircleToMove) Pair(start, Pair(newX, newY)) else Pair(start, end)
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            selectedCircleToMove = findInMap(circles, circleRadius, offset)
+                        },
+                        onDragEnd = {
+                            selectedCircleToMove = null
+                        },
+                        onDragCancel = {
+                            selectedCircleToMove = null
+                        },
+                        onDrag = { change, dragAmount ->
+                            selectedCircleToMove?.let { circleId ->
+                                val newX = circles[circleId]!!.first + dragAmount.x
+                                val newY = circles[circleId]!!.second + dragAmount.y
+                                circles = circles.toMutableMap().apply { this[circleId] = Pair(newX, newY) }
+                                dragOffset += change.positionChange()
+
+                                // Update connected lines
+                                lines = lines.toMutableMap().apply {
+                                    for ((key, value) in this) {
+                                        if (key.first == circleId) {
+                                            this[key] = Pair(Pair(newX, newY), value.second)
+                                        } else if (key.second == circleId) {
+                                            this[key] = Pair(value.first, Pair(newX, newY))
+                                        }
+                                    }
+                                }
                             }
-                            selectedCircleToMove = Pair(newX,newY)
-                            dragOffset += change.positionChange()
                         }
-                    }
-                )
+                    )
             }.onSizeChanged { newSize ->
                 val temp = with(density) { DpSize(newSize.width.toDp(), newSize.height.toDp()) }
                 if (temp != windowSize) {
@@ -164,41 +170,41 @@ fun app() {
                     windowHeight = with(density) { newSize.height.toDp() }
                 }
             })
-
         {
-            lines.forEach { (start, end) ->
+            lines.forEach { (_, value) ->
                 Canvas(modifier = Modifier.align(Alignment.Center)) {
                     drawLine(
                         color = Color.Gray,
-                        start = Offset(start.first - windowWidth.value / 2 + dragOffset.x, start.second - windowHeight.value / 2 + dragOffset.y),
-                        end = Offset(end.first - windowWidth.value / 2 + dragOffset.x, end.second - windowHeight.value / 2 + dragOffset.y),
+                        start = Offset(value.first.first - windowWidth.value / 2 , value.first.second - windowHeight.value / 2 ),
+                        end = Offset(value.second.first - windowWidth.value / 2, value.second.second - windowHeight.value / 2),
                         strokeWidth = 2f
                     )
                 }
             }
-            circles.forEach { (x, y) ->
+
+            circles.forEach { (key, value) ->
                 Canvas(modifier = Modifier.align(Alignment.Center)) {
                     drawCircle(
                         color = Color.Red,
                         radius = circleRadius.value,
-                        center = Offset(x - windowWidth.value / 2 + dragOffset.x, y - windowHeight.value / 2 + dragOffset.y),
+                        center = Offset(value.first - windowWidth.value / 2, value.second - windowHeight.value / 2),
                         style = Fill
                     )
-                    if (selectedCircle == Pair(x,y) || selectedCircleToMove == Pair(x,y) || startConnectingPoint == Pair(x,y)){
+                    if (selectedCircle == key || selectedCircleToMove == key || startConnectingPoint == key) {
                         drawCircle(
                             color = Color.Blue,
                             radius = circleRadius.value + 1,
-                            center = Offset(x - windowWidth.value / 2 + dragOffset.x, y - windowHeight.value / 2 + dragOffset.y),
-                            style = Stroke(width = 2.dp.toPx()) // Ширина окантовки в пикселях
+                            center = Offset(value.first - windowWidth.value / 2, value.second - windowHeight.value / 2),
+                            style = Stroke(width = 2.dp.toPx())
                         )
                     }
                 }
             }
 
-            // Отображаем всплывающее окно, если круг выбран
-            selectedCircle?.let { (x, y) ->
+// Отображаем всплывающее окно, если круг выбран
+            selectedCircle?.let { key ->
                 DialogWindow(onCloseRequest = { selectedCircle = null },
-                    state = DialogState(position = WindowPosition(Dp(x), Dp(y))),
+                    state = DialogState(position = WindowPosition(Dp(circles[key]!!.first), Dp(circles[key]!!.second))),
                     content = {
                         Box(modifier = Modifier.padding(16.dp).fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text("Всплывающее окно")
@@ -209,6 +215,8 @@ fun app() {
         }
     }
 }
+
+
 
 fun main() = application {
     Window(onCloseRequest = ::exitApplication, state = rememberWindowState()) {
