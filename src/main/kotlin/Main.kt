@@ -17,9 +17,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.application
-import androidx.compose.ui.window.rememberWindowState
+import androidx.compose.ui.window.*
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 @Composable
 @Preview
@@ -31,6 +31,9 @@ fun app() {
     var windowHeight by remember { mutableStateOf(windowState.size.height) }
 
     var circles by remember { mutableStateOf(listOf<Pair<Float, Float>>()) }
+    var selectedCircle by remember { mutableStateOf<Pair<Float, Float>?>(null) }
+    var startConnectingPoint by remember { mutableStateOf<Pair<Float, Float>?>(null) }
+    var endConnectingPoint by remember { mutableStateOf<Pair<Float, Float>?>(null) }
     val circleRadius: Dp = 20.dp
 
     var selectedOption by remember { mutableStateOf("Создать узлы") }
@@ -57,12 +60,39 @@ fun app() {
                 onClick = { selectedOption = "Перемещение" }
             )
             Text("Перемещение")
+
+            RadioButton(
+                selected = selectedOption == "Редактировать",
+                onClick = { selectedOption = "Редактировать" }
+            )
+            Text("Редактировать")
         }
 
         Box(modifier = Modifier.fillMaxSize().background(Color.White).pointerInput(Unit) {
             detectTapGestures(onTap = { offset ->
                 if (selectedOption == "Создать узлы") {
-                    circles += Pair(offset.x - windowWidth.value / 2, offset.y - windowHeight.value / 2)
+                    circles += Pair(offset.x, offset.y)
+                } else if (selectedOption == "Редактировать") {
+                    val hitCircle = circles.find { (x, y) ->
+                        val distance = sqrt(((offset.x) - x).pow(2) + ((offset.y) - y).pow(2))
+                        distance <= circleRadius.value
+                    }
+                    selectedCircle = hitCircle
+                } else if (selectedOption == "Соединить узлы") {
+                    val hitCircle = circles.find { (x, y) ->
+                        val distance = sqrt(((offset.x) - x).pow(2) + ((offset.y) - y).pow(2))
+                        distance <= circleRadius.value
+                    }
+                    if (hitCircle != null) {
+                        if (startConnectingPoint == null) {
+                            startConnectingPoint = hitCircle
+                        } else if (endConnectingPoint == null && startConnectingPoint != hitCircle) {
+                            endConnectingPoint = hitCircle
+                        } else {
+                            startConnectingPoint = null
+                            endConnectingPoint = null
+                        }
+                    }
                 }
             })
         }.onSizeChanged { newSize ->
@@ -78,14 +108,42 @@ fun app() {
                     drawCircle(
                         color = Color.Red,
                         radius = circleRadius.value,
-                        center = Offset(x, y),
+                        center = Offset(x - windowWidth.value / 2, y - windowHeight.value / 2),
                         style = Fill
                     )
                 }
             }
+
+            // Draw the connecting line if two circles are selected
+            if (startConnectingPoint != null && endConnectingPoint != null) {
+                println(Offset(startConnectingPoint!!.first, startConnectingPoint!!.second))
+                Canvas(modifier = Modifier.align(Alignment.Center)) {
+                    drawLine(
+                        color = Color.Gray,
+                        start = Offset(startConnectingPoint!!.first, startConnectingPoint!!.second),
+                        end = Offset(endConnectingPoint!!.first, endConnectingPoint!!.second),
+                        strokeWidth = 2f
+                    )
+                }
+                // Reset the connecting points after drawing the line
+                startConnectingPoint = null
+                endConnectingPoint = null
+            }
+
+            // Отображаем всплывающее окно, если круг выбран
+            selectedCircle?.let { (x, y) ->
+                DialogWindow(onCloseRequest = { selectedCircle = null },
+                    state = DialogState(position = WindowPosition(Dp(x), Dp(y))),
+                    content = {
+                        Box(modifier = Modifier.padding(16.dp).fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("Всплывающее окно")
+                        }
+                    })
+            }
         }
     }
 }
+
 fun main() = application {
     Window(onCloseRequest = ::exitApplication, state = rememberWindowState()) {
         app()
