@@ -1,3 +1,4 @@
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -8,10 +9,14 @@ import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onSizeChanged
@@ -24,6 +29,7 @@ import androidx.compose.ui.window.*
 import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.random.Random
+import androidx.compose.ui.input.key.Key
 
 //function to find in Map key by the value
 fun findInMap(dict: MutableMap<Int, Pair<Float, Float>>, circleRadius: Dp, offset: Offset): Int? {
@@ -36,6 +42,8 @@ fun findInMap(dict: MutableMap<Int, Pair<Float, Float>>, circleRadius: Dp, offse
     return null
 }
 
+data class Action(val type: String, val data: Any?)
+
 @Composable
 fun app() {
     val windowState = rememberWindowState()
@@ -47,6 +55,7 @@ fun app() {
     var lines by remember { mutableStateOf(mutableMapOf<Pair<Int, Int>, Pair<Pair<Float, Float>, Pair<Float, Float>>>()) }
 
     var selectedCircle by remember { mutableStateOf<Int?>(null) }
+    var isDragging by remember { mutableStateOf(false) }
     var selectedCircleToMove by remember { mutableStateOf<Int?>(null) }
     var startConnectingPoint by remember { mutableStateOf<Int?>(null) }
     var endConnectingPoint by remember { mutableStateOf<Int?>(null) }
@@ -57,6 +66,23 @@ fun app() {
     var additionalOptionsGroup2 by remember { mutableStateOf(false) }
     var additionalOptionsGroup3 by remember { mutableStateOf(false) }
     var openSettings by remember { mutableStateOf(false) }
+    var switchState by remember { mutableStateOf(false) }
+    var colorStates by remember { mutableStateOf(mutableListOf(Color.White, Color.Red, Color.Blue, Color.Gray, Color.Black)) }
+    if (switchState){
+        colorStates[0] = Color.Black
+        colorStates[1] = Color.Red
+        colorStates[2] = Color.Yellow
+        colorStates[3] = Color.LightGray
+        colorStates[4] = Color.White
+    } else {
+        colorStates[0] = Color.White
+        colorStates[1] = Color.Red
+        colorStates[2] = Color.Blue
+        colorStates[3] = Color.Gray
+        colorStates[4] = Color.Black
+    }
+
+    val actionStack = remember { mutableStateListOf<Action>() }
 
     var selectedOption by remember { mutableStateOf(1) }
     var nodeCounter by remember { mutableStateOf(0) }
@@ -65,8 +91,9 @@ fun app() {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .background(colorStates[0])
                 .padding(8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+            horizontalArrangement = Arrangement.Start
         ) {
             IconButton(onClick = {
                 expanded = true
@@ -84,6 +111,10 @@ fun app() {
             DropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
+                modifier = Modifier.background(colorStates[0]).padding(1.dp).waterfallPadding().shadow(elevation = 4.dp,
+                    spotColor = colorStates[4],
+                    ambientColor = colorStates[0])
+
             ) {
                 DropdownMenuItem(onClick = {
                     println("Option 1 clicked")
@@ -91,7 +122,7 @@ fun app() {
                     additionalOptionsGroup2 = false
                     additionalOptionsGroup3 = false
                 }) {
-                    Text("Option 1")
+                    Text("Option 1", color=colorStates[4])
                 }
                 if (additionalOptionsGroup1) {
                     DropdownMenuItem(onClick = {
@@ -107,21 +138,21 @@ fun app() {
                         expanded = false
                         additionalOptionsGroup1 = false
                     }) {
-                        Text("Разложить граф")
+                        Text("Разложить граф", color=colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
                         println("Additional Option 2 clicked")
                         expanded = false
                         additionalOptionsGroup1 = false
                     }) {
-                        Text("Additional Option 2")
+                        Text("Additional Option 2", color=colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
                         println("Additional Option 3 clicked")
                         expanded = false
                         additionalOptionsGroup1 = false
                     }) {
-                        Text("Additional Option 3")
+                        Text("Additional Option 3", color=colorStates[4])
                     }
                 }
                 DropdownMenuItem(onClick = {
@@ -130,7 +161,7 @@ fun app() {
                     additionalOptionsGroup1 = false
                     additionalOptionsGroup3 = false
                 }) {
-                    Text("Option 2")
+                    Text("Option 2", color=colorStates[4])
                 }
                 if (additionalOptionsGroup2) {
                     DropdownMenuItem(onClick = {
@@ -138,21 +169,21 @@ fun app() {
                         expanded = false
                         additionalOptionsGroup2 = false
                     }) {
-                        Text("Additional Option 1")
+                        Text("Additional Option 1", color=colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
                         println("Additional Option 2 clicked")
                         expanded = false
                         additionalOptionsGroup2 = false
                     }) {
-                        Text("Additional Option 2")
+                        Text("Additional Option 2", color=colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
                         println("Additional Option 3 clicked")
                         expanded = false
                         additionalOptionsGroup2 = false
                     }) {
-                        Text("Additional Option 3")
+                        Text("Additional Option 3", color=colorStates[4])
                     }
                 }
                 DropdownMenuItem(onClick = {
@@ -161,7 +192,7 @@ fun app() {
                     additionalOptionsGroup1 = false
                     additionalOptionsGroup2 = false
                 }) {
-                    Text("Option 3")
+                    Text("Option 3", color=colorStates[4])
                 }
                 if (additionalOptionsGroup3) {
                     DropdownMenuItem(onClick = {
@@ -169,35 +200,46 @@ fun app() {
                         expanded = false
                         additionalOptionsGroup3 = false
                     }) {
-                        Text("Additional Option 1")
+                        Text("Additional Option 1", color=colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
                         println("Additional Option 2 clicked")
                         expanded = false
                         additionalOptionsGroup3 = false
                     }) {
-                        Text("Additional Option 2")
+                        Text("Additional Option 2", color=colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
                         println("Additional Option 3 clicked")
                         expanded = false
                         additionalOptionsGroup3 = false
                     }) {
-                        Text("Additional Option 3")
+                        Text("Additional Option 3", color=colorStates[4])
                     }
                 }
                 DropdownMenuItem(onClick = {
                     println("settings")
                     openSettings = true
                 }) {
-                    Text("settings")
+                    Text("settings", color=colorStates[4])
                 }
                 if (openSettings){
                     DialogWindow(onCloseRequest = { openSettings = false },
                         state = DialogState(position = WindowPosition(200.dp, 200.dp)),
                         content = {
-                            Box(modifier = Modifier.padding(16.dp).fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text("Всплывающее окно")
+                            Box(modifier = Modifier.padding(1.dp).fillMaxSize().background(colorStates[0]), contentAlignment = Alignment.Center) {
+                                Column {
+                                    Text("This is a popup window", color=colorStates[4])
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("Dark theme:", color=colorStates[4])
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Switch(
+                                            checked = switchState,
+                                            onCheckedChange = { switchState = it }
+                                        )
+                                    }
+                                }
                             }
                         }
                     )
@@ -205,35 +247,77 @@ fun app() {
             }
             RadioButton(
                 selected = selectedOption == 1,
-                onClick = { selectedOption = 1 }
+                onClick = { selectedOption = 1 },
+                colors = RadioButtonDefaults.colors(
+                    unselectedColor = colorStates[4], // Цвет неактивного радиобаттона
+                    selectedColor = Color.Cyan // Цвет активного радиобаттона
+                )
             )
-            Text("Создать узлы", modifier = Modifier.align(Alignment.CenterVertically))
+            Text("Создать узлы", modifier = Modifier.align(Alignment.CenterVertically), color=colorStates[4])
 
             RadioButton(
                 selected = selectedOption == 2,
-                onClick = { selectedOption = 2 }
-            )
-            Text("Соединить узлы", modifier = Modifier.align(Alignment.CenterVertically))
+                onClick = { selectedOption = 2 },
+                colors = RadioButtonDefaults.colors(
+                    unselectedColor = colorStates[4], // Цвет неактивного радиобаттона
+                    selectedColor = Color.Cyan // Цвет активного радиобаттона
+                )
 
-            RadioButton(
-                selected = selectedOption == 3,
-                onClick = { selectedOption = 3 }
             )
-            Text("Перемещение", modifier = Modifier.align(Alignment.CenterVertically))
+            Text("Соединить узлы", modifier = Modifier.align(Alignment.CenterVertically), color=colorStates[4])
+
+//            RadioButton(
+//                selected = selectedOption == 3,
+//                onClick = { selectedOption = 3 },
+//                colors = RadioButtonDefaults.colors(
+//                    unselectedColor = colorStates[4], // Цвет неактивного радиобаттона
+//                    selectedColor = Color.Cyan // Цвет активного радиобаттона
+//                )
+//            )
+//            Text("Перемещение", modifier = Modifier.align(Alignment.CenterVertically), color=colorStates[4])
 
             RadioButton(
                 selected = selectedOption == 4,
-                onClick = { selectedOption = 4 }
+                onClick = { selectedOption = 4 },
+                colors = RadioButtonDefaults.colors(
+                    unselectedColor = colorStates[4], // Цвет неактивного радиобаттона
+                    selectedColor = Color.Cyan // Цвет активного радиобаттона
+                )
             )
-            Text("Редактировать", modifier = Modifier.align(Alignment.CenterVertically))
+            Text("Редактировать", modifier = Modifier.align(Alignment.CenterVertically), color=colorStates[4])
         }
         Box(modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(colorStates[0])
+            .onPreviewKeyEvent {
+                println(it.key)
+                println(it.isCtrlPressed)
+                if (it.key == Key.Z && it.isCtrlPressed) {
+                    println(actionStack)
+                    if (actionStack.isNotEmpty()) {
+                        val lastAction = actionStack.removeLast()
+                        when (lastAction.type) {
+                            "addNode" -> {
+                                circles.remove(lastAction.data as Int)
+                                nodeCounter--
+                            }
+                            "connectNodes" -> {
+                                val (start, end) = lastAction.data as Pair<Int, Int>
+                                lines.remove(Pair(start, end))
+                            }
+                            // Добавьте обработку для других типов действий, если они есть
+                        }
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
             .pointerInput(Unit) {
                 detectTapGestures(onTap = { offset ->
                     when (selectedOption) {
                         1 -> {
+                            actionStack.add(Action("addNode", nodeCounter))
                             circles = circles.toMutableMap().apply { this[nodeCounter] = Pair(offset.x, offset.y) }
                             nodeCounter += 1
                         }
@@ -250,6 +334,7 @@ fun app() {
                                             endConnectingPoint
                                         ) in lines)
                                     ) {
+                                        actionStack.add(Action("connectNodes", Pair(startConnectingPoint!!, endConnectingPoint!!)))
                                         lines = lines.toMutableMap().apply {
                                             this[Pair(startConnectingPoint!!, endConnectingPoint!!)] =
                                                 Pair(circles[startConnectingPoint]!!, circles[endConnectingPoint]!!)
@@ -269,9 +354,9 @@ fun app() {
                             selectedCircle = findInMap(circles, circleRadius, offset)
                         }
 
-                        3 -> {
-                            selectedCircleToMove = findInMap(circles, circleRadius, offset)
-                        }
+//                        3 -> {
+//                            selectedCircleToMove = findInMap(circles, circleRadius, offset)
+//                        }
                     }
                 })
             }.onSizeChanged { newSize ->
@@ -286,14 +371,29 @@ fun app() {
                 detectDragGestures(
                     onDragStart = { offset ->
                         selectedCircleToMove = findInMap(circles, circleRadius, offset)
+                        isDragging = selectedCircleToMove == null
                     },
                     onDragEnd = {
                         selectedCircleToMove = null
+                        isDragging = false
                     },
                     onDragCancel = {
                         selectedCircleToMove = null
+                        isDragging = false
                     },
                     onDrag = { change, dragAmount ->
+                        if (isDragging) {
+                            // Перемещаем все круги и линии
+                            circles = circles.mapValues { (_, value) ->
+                                Pair(value.first + dragAmount.x, value.second + dragAmount.y)
+                            } as MutableMap<Int, Pair<Float, Float>>
+                            lines = lines.mapValues { (_, value) ->
+                                Pair(
+                                    Pair(value.first.first + dragAmount.x, value.first.second + dragAmount.y),
+                                    Pair(value.second.first + dragAmount.x, value.second.second + dragAmount.y)
+                                )
+                            } as MutableMap<Pair<Int, Int>, Pair<Pair<Float, Float>, Pair<Float, Float>>>
+                        }
                         selectedCircleToMove?.let { circleId ->
                             val newX = circles[circleId]!!.first + dragAmount.x
                             val newY = circles[circleId]!!.second + dragAmount.y
@@ -325,7 +425,7 @@ fun app() {
             lines.forEach { (_, value) ->
                 Canvas(modifier = Modifier.align(Alignment.Center)) {
                     drawLine(
-                        color = Color.Gray,
+                        color = colorStates[3],
                         start = Offset(
                             value.first.first - windowWidth.value / 2,
                             value.first.second - windowHeight.value / 2
@@ -342,14 +442,14 @@ fun app() {
             circles.forEach { (key, value) ->
                 Canvas(modifier = Modifier.align(Alignment.Center)) {
                     drawCircle(
-                        color = Color.Red,
+                        color = colorStates[1],
                         radius = circleRadius.value,
                         center = Offset(value.first - windowWidth.value / 2, value.second - windowHeight.value / 2),
                         style = Fill
                     )
                     if (selectedCircle == key || selectedCircleToMove == key || startConnectingPoint == key) {
                         drawCircle(
-                            color = Color.Blue,
+                            color = colorStates[2],
                             radius = circleRadius.value + 1,
                             center = Offset(value.first - windowWidth.value / 2, value.second - windowHeight.value / 2),
                             style = Stroke(width = 2.dp.toPx())
@@ -363,8 +463,8 @@ fun app() {
                 DialogWindow(onCloseRequest = { selectedCircle = null },
                     state = DialogState(position = WindowPosition(Dp(circles[key]!!.first), Dp(circles[key]!!.second))),
                     content = {
-                        Box(modifier = Modifier.padding(16.dp).fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Всплывающее окно")
+                        Box(modifier = Modifier.padding(1.dp).fillMaxSize().background(colorStates[0]), contentAlignment = Alignment.Center) {
+                            Text("Всплывающее окно", color=colorStates[4])
                         }
                     }
                 )
