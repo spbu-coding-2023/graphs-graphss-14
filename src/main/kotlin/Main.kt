@@ -299,7 +299,7 @@ fun app() {
                                 nodeCounter--
                             }
                             2 -> {
-                                val (start, end) = lastAction.data as Pair<Int, Int>
+                                val (start, end) = lastAction.data as Pair<*, *>
                                 lines.remove(Pair(start, end))
                             }
                             // Добавьте обработку для других типов действий, если они есть
@@ -420,41 +420,38 @@ fun app() {
                 }
             })
         {
-            lines.forEach { (_, value) ->
-                Canvas(modifier = Modifier.align(Alignment.Center)) {
+            Canvas(modifier = Modifier.align(Alignment.TopStart)) {
+                val canvasWidth = size.width
+                val canvasHeight = size.height
+
+                // Отрисовка линий
+                for ((_, value) in lines) {
                     drawLine(
                         color = colorStates[3],
-                        start = Offset(
-                            (value.first.first.toPx() - windowWidth.value / 2),
-                            value.first.second.toPx() - windowHeight.value / 2
-                        ),
-                        end = Offset(
-                            value.second.first.toPx() - windowWidth.value / 2,
-                            value.second.second.toPx() - windowHeight.value / 2
-                        ),
+                        start = Offset(value.first.first.value - canvasWidth / 2, value.first.second.value - canvasHeight / 2),
+                        end = Offset(value.second.first.value - canvasWidth / 2, value.second.second.value - canvasHeight / 2),
                         strokeWidth = 2f
                     )
                 }
-            }
 
-            circles.forEach { (key, value) ->
-                Canvas(modifier = Modifier.align(Alignment.Center)) {
+                // Отрисовка кругов
+                for ((key, value) in circles) {
                     drawCircle(
                         color = colorStates[1],
                         radius = circleRadius.value,
-                        center = Offset(value.first.toPx() - windowWidth.value /2, value.second.toPx() - windowHeight.value/2),
+                        center = Offset(value.first.value - canvasWidth / 2, value.second.value - canvasHeight / 2),
                         style = Fill
                     )
+                    // Проверка, является ли круг выбранным или перемещаемым
                     if (selectedCircle == key || selectedCircleToMove == key || startConnectingPoint == key) {
                         drawCircle(
                             color = colorStates[2],
                             radius = circleRadius.value + 1,
-                            center = Offset(value.first.toPx() - windowWidth.value / 2, value.second.toPx() - windowHeight.value / 2),
+                            center = Offset(value.first.value - canvasWidth / 2, value.second.value - canvasHeight / 2),
                             style = Stroke(width = 2.dp.toPx())
                         )
                     }
                 }
-
             }
 
 // Отображаем всплывающее окно, если круг выбран
@@ -490,7 +487,7 @@ fun mainScreen(onStartClick: () -> Unit) {
 
 fun main() = application {
     val density = LocalDensity.current
-    val windowSize = with(density) { DpSize(800.dp.toPx().toInt().toDp(), 600.dp.toPx().toInt().toDp()) }
+    val windowSize = with(density) { DpSize(800.dp.value.toInt().toDp(), 600.dp.value.toInt().toDp()) }
 
     var showMainScreen by remember { mutableStateOf(true) }
 
