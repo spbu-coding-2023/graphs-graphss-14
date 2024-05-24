@@ -1,4 +1,3 @@
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -14,9 +13,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.key.isCtrlPressed
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onSizeChanged
@@ -29,12 +26,11 @@ import androidx.compose.ui.window.*
 import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.random.Random
-import androidx.compose.ui.input.key.Key
 
 //function to find in Map key by the value
-fun findInMap(dict: MutableMap<Int, Pair<Float, Float>>, circleRadius: Dp, offset: Offset): Int? {
+fun findInMap(dict: MutableMap<Int, Pair<Dp, Dp>>, circleRadius: Dp, offset: Offset): Int? {
     for ((key, value) in dict) {
-        val distance = sqrt(((offset.x) - value.first).pow(2) + ((offset.y) - value.second).pow(2))
+        val distance = sqrt(((offset.x) - value.first.value).pow(2) + ((offset.y) - value.second.value).pow(2))
         if (distance <= circleRadius.value) {
             return key
         }
@@ -42,7 +38,7 @@ fun findInMap(dict: MutableMap<Int, Pair<Float, Float>>, circleRadius: Dp, offse
     return null
 }
 
-data class Action(val type: String, val data: Any?)
+data class Action(val type: Int, val data: Any?)
 
 @Composable
 fun app() {
@@ -51,8 +47,8 @@ fun app() {
     var windowSize by remember { mutableStateOf(windowState.size) }
     var windowHeight by remember { mutableStateOf(windowState.size.height) }
     var windowWidth by remember { mutableStateOf(windowState.size.width) }
-    var circles by remember { mutableStateOf(mutableMapOf<Int, Pair<Float, Float>>()) }
-    var lines by remember { mutableStateOf(mutableMapOf<Pair<Int, Int>, Pair<Pair<Float, Float>, Pair<Float, Float>>>()) }
+    var circles by remember { mutableStateOf(mutableMapOf<Int, Pair<Dp, Dp>>()) }
+    var lines by remember { mutableStateOf(mutableMapOf<Pair<Int, Int>, Pair<Pair<Dp, Dp>, Pair<Dp, Dp>>>()) }
 
     var selectedCircle by remember { mutableStateOf<Int?>(null) }
     var isDragging by remember { mutableStateOf(false) }
@@ -67,7 +63,7 @@ fun app() {
     var additionalOptionsGroup3 by remember { mutableStateOf(false) }
     var openSettings by remember { mutableStateOf(false) }
     var switchState by remember { mutableStateOf(false) }
-    var colorStates by remember { mutableStateOf(mutableListOf(Color.White, Color.Red, Color.Blue, Color.Gray, Color.Black)) }
+    val colorStates by remember { mutableStateOf(mutableListOf(Color.White, Color.Red, Color.Blue, Color.Gray, Color.Black)) }
     if (switchState){
         colorStates[0] = Color.Black
         colorStates[1] = Color.Red
@@ -128,8 +124,8 @@ fun app() {
                     DropdownMenuItem(onClick = {
                         //tyt raskladka norm doljna bit
                         circles.forEach{(key, _) ->
-                            circles[key] = Pair(Random.nextInt(0, windowWidth.value.toInt()).toFloat(),
-                                Random.nextInt(0, windowHeight.value.toInt()).toFloat())
+                            circles[key] = Pair(Dp(Random.nextFloat() * windowWidth.value.toInt()),
+                                Dp(Random.nextInt(0, windowHeight.value.toInt()).toFloat()))
                         }
                         lines.forEach{(key, _) ->
                             lines[key] = Pair(circles[key.first]!!, circles[key.second]!!)
@@ -288,20 +284,21 @@ fun app() {
         }
         Box(modifier = Modifier
             .fillMaxSize()
+
             .background(colorStates[0])
-            .onPreviewKeyEvent {
-                println(it.key)
-                println(it.isCtrlPressed)
-                if (it.key == Key.Z && it.isCtrlPressed) {
+            .onPreviewKeyEvent{ event ->
+                println(event.key)
+                println(event.isCtrlPressed)
+                if (event.key == Key.Z && event.isCtrlPressed) {
                     println(actionStack)
                     if (actionStack.isNotEmpty()) {
                         val lastAction = actionStack.removeLast()
                         when (lastAction.type) {
-                            "addNode" -> {
+                            1 -> {
                                 circles.remove(lastAction.data as Int)
                                 nodeCounter--
                             }
-                            "connectNodes" -> {
+                            2 -> {
                                 val (start, end) = lastAction.data as Pair<Int, Int>
                                 lines.remove(Pair(start, end))
                             }
@@ -317,8 +314,9 @@ fun app() {
                 detectTapGestures(onTap = { offset ->
                     when (selectedOption) {
                         1 -> {
-                            actionStack.add(Action("addNode", nodeCounter))
-                            circles = circles.toMutableMap().apply { this[nodeCounter] = Pair(offset.x, offset.y) }
+                            actionStack.add(Action(1, nodeCounter))
+                            circles = circles.toMutableMap().apply { this[nodeCounter] = Pair(offset.x.toDp(), offset.y.toDp()) }
+                            println(offset)
                             nodeCounter += 1
                         }
 
@@ -334,7 +332,7 @@ fun app() {
                                             endConnectingPoint
                                         ) in lines)
                                     ) {
-                                        actionStack.add(Action("connectNodes", Pair(startConnectingPoint!!, endConnectingPoint!!)))
+                                        actionStack.add(Action(2, Pair(startConnectingPoint!!, endConnectingPoint!!)))
                                         lines = lines.toMutableMap().apply {
                                             this[Pair(startConnectingPoint!!, endConnectingPoint!!)] =
                                                 Pair(circles[startConnectingPoint]!!, circles[endConnectingPoint]!!)
@@ -385,18 +383,18 @@ fun app() {
                         if (isDragging) {
                             // Перемещаем все круги и линии
                             circles = circles.mapValues { (_, value) ->
-                                Pair(value.first + dragAmount.x, value.second + dragAmount.y)
-                            } as MutableMap<Int, Pair<Float, Float>>
+                                Pair(value.first + dragAmount.x.toDp(), value.second + dragAmount.y.toDp())
+                            } as MutableMap<Int, Pair<Dp, Dp>>
                             lines = lines.mapValues { (_, value) ->
                                 Pair(
-                                    Pair(value.first.first + dragAmount.x, value.first.second + dragAmount.y),
-                                    Pair(value.second.first + dragAmount.x, value.second.second + dragAmount.y)
+                                    Pair(value.first.first + dragAmount.x.toDp(), value.first.second + dragAmount.y.toDp()),
+                                    Pair(value.second.first + dragAmount.x.toDp(), value.second.second + dragAmount.y.toDp())
                                 )
-                            } as MutableMap<Pair<Int, Int>, Pair<Pair<Float, Float>, Pair<Float, Float>>>
+                            } as MutableMap<Pair<Int, Int>, Pair<Pair<Dp, Dp>, Pair<Dp, Dp>>>
                         }
                         selectedCircleToMove?.let { circleId ->
-                            val newX = circles[circleId]!!.first + dragAmount.x
-                            val newY = circles[circleId]!!.second + dragAmount.y
+                            val newX = circles[circleId]!!.first + dragAmount.x.toDp()
+                            val newY = circles[circleId]!!.second + dragAmount.y.toDp()
                             circles = circles.toMutableMap().apply { this[circleId] = Pair(newX, newY) }
                             dragOffset += change.positionChange()
 
@@ -427,12 +425,12 @@ fun app() {
                     drawLine(
                         color = colorStates[3],
                         start = Offset(
-                            value.first.first - windowWidth.value / 2,
-                            value.first.second - windowHeight.value / 2
+                            (value.first.first.toPx() - windowWidth.value / 2),
+                            value.first.second.toPx() - windowHeight.value / 2
                         ),
                         end = Offset(
-                            value.second.first - windowWidth.value / 2,
-                            value.second.second - windowHeight.value / 2
+                            value.second.first.toPx() - windowWidth.value / 2,
+                            value.second.second.toPx() - windowHeight.value / 2
                         ),
                         strokeWidth = 2f
                     )
@@ -444,24 +442,25 @@ fun app() {
                     drawCircle(
                         color = colorStates[1],
                         radius = circleRadius.value,
-                        center = Offset(value.first - windowWidth.value / 2, value.second - windowHeight.value / 2),
+                        center = Offset(value.first.toPx() - windowWidth.value /2, value.second.toPx() - windowHeight.value/2),
                         style = Fill
                     )
                     if (selectedCircle == key || selectedCircleToMove == key || startConnectingPoint == key) {
                         drawCircle(
                             color = colorStates[2],
                             radius = circleRadius.value + 1,
-                            center = Offset(value.first - windowWidth.value / 2, value.second - windowHeight.value / 2),
+                            center = Offset(value.first.toPx() - windowWidth.value / 2, value.second.toPx() - windowHeight.value / 2),
                             style = Stroke(width = 2.dp.toPx())
                         )
                     }
                 }
+
             }
 
 // Отображаем всплывающее окно, если круг выбран
             selectedCircle?.let { key ->
                 DialogWindow(onCloseRequest = { selectedCircle = null },
-                    state = DialogState(position = WindowPosition(Dp(circles[key]!!.first), Dp(circles[key]!!.second))),
+                    state = DialogState(position = WindowPosition((circles[key]!!.first), (circles[key]!!.second))),
                     content = {
                         Box(modifier = Modifier.padding(1.dp).fillMaxSize().background(colorStates[0]), contentAlignment = Alignment.Center) {
                             Text("Всплывающее окно", color=colorStates[4])
@@ -473,10 +472,35 @@ fun app() {
     }
 }
 
-
+@Composable
+fun mainScreen(onStartClick: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Button(onClick = onStartClick) {
+            Text("Start")
+        }
+        Button(onClick = { /* Handle other button click */ }) {
+            Text("Other Option")
+        }
+    }
+}
 
 fun main() = application {
-    Window(onCloseRequest = ::exitApplication, state = rememberWindowState()) {
+    val density = LocalDensity.current
+    val windowSize = with(density) { DpSize(800.dp.toPx().toInt().toDp(), 600.dp.toPx().toInt().toDp()) }
+
+    var showMainScreen by remember { mutableStateOf(true) }
+
+    if (showMainScreen) {
+        Window(onCloseRequest = ::exitApplication) {
+            mainScreen(onStartClick = { showMainScreen = false })
+        }
+    } else {
+            Window(onCloseRequest = ::exitApplication, state = WindowState(size = windowSize)) {
         app()
+        }
     }
 }
