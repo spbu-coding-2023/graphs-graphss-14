@@ -1,3 +1,4 @@
+import algos.Graph
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -27,6 +28,8 @@ import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.random.Random
 
+data class nodeParameters(val colorNode: Color, val int2: Int)
+
 //function to find in Map key by the value
 fun findInMap(dict: MutableMap<Int, Pair<Dp, Dp>>, circleRadius: Dp, offset: Offset): Int? {
     for ((key, value) in dict) {
@@ -47,9 +50,10 @@ fun app() {
     var windowSize by remember { mutableStateOf(windowState.size) }
     var windowHeight by remember { mutableStateOf(windowState.size.height) }
     var windowWidth by remember { mutableStateOf(windowState.size.width) }
-    var circles by remember { mutableStateOf(mutableMapOf<Int, Pair<Dp, Dp>>()) }
-    var lines by remember { mutableStateOf(mutableMapOf<Pair<Int, Int>, Pair<Pair<Dp, Dp>, Pair<Dp, Dp>>>()) }
-
+    var circlesToDraw by remember { mutableStateOf(mutableMapOf<Int, Pair<Dp, Dp>>()) }
+    var linesToDraw by remember { mutableStateOf(mutableMapOf<Pair<Int, Int>, Pair<Pair<Dp, Dp>, Pair<Dp, Dp>>>()) }
+    val graph = remember{ Graph() }
+    var bridges = remember {  mutableStateOf(listOf<Pair<Int,Int>>())}
     var selectedCircle by remember { mutableStateOf<Int?>(null) }
     var isDragging by remember { mutableStateOf(false) }
     var selectedCircleToMove by remember { mutableStateOf<Int?>(null) }
@@ -58,11 +62,13 @@ fun app() {
     val circleRadius: Dp = 20.dp
 
     var expanded by remember { mutableStateOf(false) }
+    var moveBack by remember { mutableStateOf<Pair<Dp,Dp>?>(null) } // доделать попозже, лень
     var additionalOptionsGroup1 by remember { mutableStateOf(false) }
     var additionalOptionsGroup2 by remember { mutableStateOf(false) }
     var additionalOptionsGroup3 by remember { mutableStateOf(false) }
     var openSettings by remember { mutableStateOf(false) }
     var switchState by remember { mutableStateOf(false) }
+    var turnBack by remember { mutableStateOf(false) }
     val colorStates by remember { mutableStateOf(mutableListOf(Color.White, Color.Red, Color.Blue, Color.Gray, Color.Black)) }
     if (switchState){
         colorStates[0] = Color.Black
@@ -95,6 +101,7 @@ fun app() {
                 expanded = true
                 additionalOptionsGroup1 = false
                 additionalOptionsGroup2 = false
+                bridges.value = listOf()
                 additionalOptionsGroup3 = false
             }) {
                 Image(
@@ -122,13 +129,13 @@ fun app() {
                 }
                 if (additionalOptionsGroup1) {
                     DropdownMenuItem(onClick = {
-                        //tyt raskladka norm doljna bit
-                        circles.forEach{(key, _) ->
-                            circles[key] = Pair(Dp(Random.nextFloat() * windowWidth.value.toInt()),
+                        //tyt raskladka norm doljna bit пока что тут рандом
+                        circlesToDraw.forEach{ (key, _) ->
+                            circlesToDraw[key] = Pair(Dp(Random.nextFloat() * windowWidth.value.toInt()),
                                 Dp(Random.nextInt(0, windowHeight.value.toInt()).toFloat()))
                         }
-                        lines.forEach{(key, _) ->
-                            lines[key] = Pair(circles[key.first]!!, circles[key.second]!!)
+                        linesToDraw.forEach{ (key, _) ->
+                            linesToDraw[key] = Pair(circlesToDraw[key.first]!!, circlesToDraw[key.second]!!)
                         }
                         //tyt raskladka norm doljna bit
                         expanded = false
@@ -171,8 +178,9 @@ fun app() {
                         println("Additional Option 2 clicked")
                         expanded = false
                         additionalOptionsGroup2 = false
+                        bridges.value = graph.findBridges()
                     }) {
-                        Text("Additional Option 2", color=colorStates[4])
+                        Text("Поиск мостов", color=colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
                         println("Additional Option 3 clicked")
@@ -281,6 +289,35 @@ fun app() {
                 )
             )
             Text("Редактировать", modifier = Modifier.align(Alignment.CenterVertically), color=colorStates[4])
+
+            IconButton(onClick = {
+                turnBack = true
+            }) {
+                Image(
+                    painter = painterResource("img/back.png"), // Замените на путь к вашему изображению
+                    contentDescription = "Back",
+                    modifier = Modifier.size(32.dp) // Размер изображения
+                )
+            }
+            if (turnBack){
+                turnBack = false
+                if (actionStack.isNotEmpty()) {
+                    val lastAction = actionStack.removeLast()
+                    when (lastAction.type) {
+                        1 -> {
+                            circlesToDraw.remove(lastAction.data as Int)
+                            nodeCounter--
+                            graph.removeNode(lastAction.data)
+                        }
+                        2 -> {
+                            val (start, end) = lastAction.data as Pair<*, *>
+                            linesToDraw.remove(Pair(start, end))
+                            graph.removeEdge(start as Int, end as Int)
+                        }
+                        // Добавьте обработку для других типов действий, если они есть
+                    }
+                }
+            }
         }
         Box(modifier = Modifier
             .fillMaxSize()
@@ -295,12 +332,14 @@ fun app() {
                         val lastAction = actionStack.removeLast()
                         when (lastAction.type) {
                             1 -> {
-                                circles.remove(lastAction.data as Int)
+                                circlesToDraw.remove(lastAction.data as Int)
                                 nodeCounter--
+                                graph.removeNode(lastAction.data)
                             }
                             2 -> {
                                 val (start, end) = lastAction.data as Pair<*, *>
-                                lines.remove(Pair(start, end))
+                                linesToDraw.remove(Pair(start, end))
+                                graph.removeEdge(start as Int, end as Int)
                             }
                             // Добавьте обработку для других типов действий, если они есть
                         }
@@ -312,31 +351,34 @@ fun app() {
             }
             .pointerInput(Unit) {
                 detectTapGestures(onTap = { offset ->
+                    bridges.value = listOf()
                     when (selectedOption) {
                         1 -> {
                             actionStack.add(Action(1, nodeCounter))
-                            circles = circles.toMutableMap().apply { this[nodeCounter] = Pair(offset.x.toDp(), offset.y.toDp()) }
+                            circlesToDraw = circlesToDraw.toMutableMap().apply { this[nodeCounter] = Pair(offset.x.toDp(), offset.y.toDp()) }
                             println(offset)
+                            graph.addNode(nodeCounter)
                             nodeCounter += 1
                         }
 
                         2 -> {
-                            val hitCircle = findInMap(circles, circleRadius, offset)
+                            val hitCircle = findInMap(circlesToDraw, circleRadius, offset)
                             if (hitCircle != null) {
                                 if (startConnectingPoint == null) {
                                     startConnectingPoint = hitCircle
                                 } else if (endConnectingPoint == null && startConnectingPoint != hitCircle) {
                                     endConnectingPoint = hitCircle
-                                    if (!(Pair(endConnectingPoint, startConnectingPoint) in lines || Pair(
+                                    if (!(Pair(endConnectingPoint, startConnectingPoint) in linesToDraw || Pair(
                                             startConnectingPoint,
                                             endConnectingPoint
-                                        ) in lines)
+                                        ) in linesToDraw)
                                     ) {
                                         actionStack.add(Action(2, Pair(startConnectingPoint!!, endConnectingPoint!!)))
-                                        lines = lines.toMutableMap().apply {
+                                        linesToDraw = linesToDraw.toMutableMap().apply {
                                             this[Pair(startConnectingPoint!!, endConnectingPoint!!)] =
-                                                Pair(circles[startConnectingPoint]!!, circles[endConnectingPoint]!!)
+                                                Pair(circlesToDraw[startConnectingPoint]!!, circlesToDraw[endConnectingPoint]!!)
                                         }
+                                        graph.addEdge(startConnectingPoint!!, endConnectingPoint!!)
                                     }
                                     startConnectingPoint = null
                                     endConnectingPoint = null
@@ -349,7 +391,7 @@ fun app() {
 
 
                         4 -> {
-                            selectedCircle = findInMap(circles, circleRadius, offset)
+                            selectedCircle = findInMap(circlesToDraw, circleRadius, offset)
                         }
 
 //                        3 -> {
@@ -368,24 +410,29 @@ fun app() {
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = { offset ->
-                        selectedCircleToMove = findInMap(circles, circleRadius, offset)
+                        selectedCircle = null
+                        selectedCircleToMove = findInMap(circlesToDraw, circleRadius, offset)
                         isDragging = selectedCircleToMove == null
+
                     },
                     onDragEnd = {
+                        selectedCircle = null
                         selectedCircleToMove = null
                         isDragging = false
                     },
                     onDragCancel = {
+                        selectedCircle = null
                         selectedCircleToMove = null
                         isDragging = false
                     },
                     onDrag = { change, dragAmount ->
                         if (isDragging) {
+                            selectedCircle = null
                             // Перемещаем все круги и линии
-                            circles = circles.mapValues { (_, value) ->
+                            circlesToDraw = circlesToDraw.mapValues { (_, value) ->
                                 Pair(value.first + dragAmount.x.toDp(), value.second + dragAmount.y.toDp())
                             } as MutableMap<Int, Pair<Dp, Dp>>
-                            lines = lines.mapValues { (_, value) ->
+                            linesToDraw = linesToDraw.mapValues { (_, value) ->
                                 Pair(
                                     Pair(value.first.first + dragAmount.x.toDp(), value.first.second + dragAmount.y.toDp()),
                                     Pair(value.second.first + dragAmount.x.toDp(), value.second.second + dragAmount.y.toDp())
@@ -393,13 +440,13 @@ fun app() {
                             } as MutableMap<Pair<Int, Int>, Pair<Pair<Dp, Dp>, Pair<Dp, Dp>>>
                         }
                         selectedCircleToMove?.let { circleId ->
-                            val newX = circles[circleId]!!.first + dragAmount.x.toDp()
-                            val newY = circles[circleId]!!.second + dragAmount.y.toDp()
-                            circles = circles.toMutableMap().apply { this[circleId] = Pair(newX, newY) }
+                            val newX = circlesToDraw[circleId]!!.first + dragAmount.x.toDp()
+                            val newY = circlesToDraw[circleId]!!.second + dragAmount.y.toDp()
+                            circlesToDraw = circlesToDraw.toMutableMap().apply { this[circleId] = Pair(newX, newY) }
                             dragOffset += change.positionChange()
 
                             // Update connected lines
-                            lines = lines.toMutableMap().apply {
+                            linesToDraw = linesToDraw.toMutableMap().apply {
                                 for ((key, value) in this) {
                                     if (key.first == circleId) {
                                         this[key] = Pair(Pair(newX, newY), value.second)
@@ -423,11 +470,14 @@ fun app() {
             Canvas(modifier = Modifier.align(Alignment.TopStart)) {
                 val canvasWidth = size.width
                 val canvasHeight = size.height
-
                 // Отрисовка линий
-                for ((_, value) in lines) {
+                for ((key, value) in linesToDraw) {
+                    var col = colorStates[4]
+                    if (Pair(key.first, key.second) in bridges.value || Pair(key.second, key.first) in bridges.value){
+                        col = Color.Magenta
+                    }
                     drawLine(
-                        color = colorStates[3],
+                        color = col,
                         start = Offset(value.first.first.value - canvasWidth / 2, value.first.second.value - canvasHeight / 2),
                         end = Offset(value.second.first.value - canvasWidth / 2, value.second.second.value - canvasHeight / 2),
                         strokeWidth = 2f
@@ -435,7 +485,7 @@ fun app() {
                 }
 
                 // Отрисовка кругов
-                for ((key, value) in circles) {
+                for ((key, value) in circlesToDraw) {
                     drawCircle(
                         color = colorStates[1],
                         radius = circleRadius.value,
@@ -452,12 +502,13 @@ fun app() {
                         )
                     }
                 }
+
             }
 
 // Отображаем всплывающее окно, если круг выбран
             selectedCircle?.let { key ->
                 DialogWindow(onCloseRequest = { selectedCircle = null },
-                    state = DialogState(position = WindowPosition((circles[key]!!.first), (circles[key]!!.second))),
+                    state = DialogState(position = WindowPosition((circlesToDraw[key]!!.first), (circlesToDraw[key]!!.second))),
                     content = {
                         Box(modifier = Modifier.padding(1.dp).fillMaxSize().background(colorStates[0]), contentAlignment = Alignment.Center) {
                             Text("Всплывающее окно", color=colorStates[4])
