@@ -1,16 +1,16 @@
 package algos
 
-class Graph {
+open class Graph {
     private val nodes = mutableListOf<Int>()
-    private val edges = mutableListOf<Pair<Int, Int>>()
-    private val adjacencyList = mutableMapOf<Int, MutableList<Int>>()
+    val edges = mutableListOf<Pair<Int, Int>>()
+    val adjacencyList = mutableMapOf<Int, MutableList<Int>>()
 
     fun addNode(n: Int) {
         nodes.add(n)
         adjacencyList[n] = mutableListOf()
     }
 
-    fun addEdge(n: Int, m: Int) {
+    open fun addEdge(n: Int, m: Int) {
         if (Pair(n, m) !in edges) {
             edges.add(Pair(n, m))
             adjacencyList[n]?.add(m)

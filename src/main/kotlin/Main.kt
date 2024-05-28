@@ -1,4 +1,6 @@
+import algos.DGraph
 import algos.Graph
+import algos.WGraph
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -8,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -15,21 +18,29 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
+import java.awt.font.TextLayout
 import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.random.Random
 
 data class nodeParameters(val colorNode: Color, val int2: Int)
 
+fun makeLineKeysFromList(nodes: List<Int>): List<Pair<Int, Int>> {
+    return nodes.zipWithNext()
+}
 //function to find in Map key by the value
 fun findInMap(dict: MutableMap<Int, Pair<Dp, Dp>>, circleRadius: Dp, offset: Offset): Int? {
     for ((key, value) in dict) {
@@ -43,6 +54,7 @@ fun findInMap(dict: MutableMap<Int, Pair<Dp, Dp>>, circleRadius: Dp, offset: Off
 
 data class Action(val type: Int, val data: Any?)
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun app() {
     val windowState = rememberWindowState()
@@ -52,15 +64,21 @@ fun app() {
     var windowWidth by remember { mutableStateOf(windowState.size.width) }
     var circlesToDraw by remember { mutableStateOf(mutableMapOf<Int, Pair<Dp, Dp>>()) }
     var linesToDraw by remember { mutableStateOf(mutableMapOf<Pair<Int, Int>, Pair<Pair<Dp, Dp>, Pair<Dp, Dp>>>()) }
+    val wdgraph = remember{ WGraph() }
+
+    val dgraph = remember{ DGraph() }
     val graph = remember{ Graph() }
-    var bridges = remember {  mutableStateOf(listOf<Pair<Int,Int>>())}
+    val bridges = remember {  mutableStateOf(listOf<Pair<Int,Int>>())}
+    val isNodesToFindWay = remember { mutableStateOf(false) }
+    val shortWayFB = remember {  mutableStateOf(listOf<Int>())}
+    val shortWayKeysLines = remember {  mutableStateOf(listOf<Int>())}
+
     var selectedCircle by remember { mutableStateOf<Int?>(null) }
     var isDragging by remember { mutableStateOf(false) }
     var selectedCircleToMove by remember { mutableStateOf<Int?>(null) }
     var startConnectingPoint by remember { mutableStateOf<Int?>(null) }
     var endConnectingPoint by remember { mutableStateOf<Int?>(null) }
-    val circleRadius: Dp = 20.dp
-
+    var circleRadius by remember { mutableStateOf(20.dp) }
     var expanded by remember { mutableStateOf(false) }
     var moveBack by remember { mutableStateOf<Pair<Dp,Dp>?>(null) } // доделать попозже, лень
     var additionalOptionsGroup1 by remember { mutableStateOf(false) }
@@ -98,10 +116,12 @@ fun app() {
             horizontalArrangement = Arrangement.Start
         ) {
             IconButton(onClick = {
+                isNodesToFindWay.value = false
                 expanded = true
                 additionalOptionsGroup1 = false
                 additionalOptionsGroup2 = false
                 bridges.value = listOf()
+                shortWayFB.value = listOf()
                 additionalOptionsGroup3 = false
             }) {
                 Image(
@@ -178,7 +198,7 @@ fun app() {
                         println("Additional Option 2 clicked")
                         expanded = false
                         additionalOptionsGroup2 = false
-                        bridges.value = graph.findBridges()
+                        bridges.value = wdgraph.findBridges()
                     }) {
                         Text("Поиск мостов", color=colorStates[4])
                     }
@@ -216,9 +236,10 @@ fun app() {
                     DropdownMenuItem(onClick = {
                         println("Additional Option 3 clicked")
                         expanded = false
+                        isNodesToFindWay.value = true
                         additionalOptionsGroup3 = false
                     }) {
-                        Text("Additional Option 3", color=colorStates[4])
+                        Text("Путь между вершинами (Форд-Беллман)", color=colorStates[4])
                     }
                 }
                 DropdownMenuItem(onClick = {
@@ -307,12 +328,12 @@ fun app() {
                         1 -> {
                             circlesToDraw.remove(lastAction.data as Int)
                             nodeCounter--
-                            graph.removeNode(lastAction.data)
+                            wdgraph.removeNode(lastAction.data)
                         }
                         2 -> {
                             val (start, end) = lastAction.data as Pair<*, *>
                             linesToDraw.remove(Pair(start, end))
-                            graph.removeEdge(start as Int, end as Int)
+                            wdgraph.removeEdge(start as Int, end as Int)
                         }
                         // Добавьте обработку для других типов действий, если они есть
                     }
@@ -323,6 +344,7 @@ fun app() {
             .fillMaxSize()
 
             .background(colorStates[0])
+
             .onPreviewKeyEvent{ event ->
                 println(event.key)
                 println(event.isCtrlPressed)
@@ -334,12 +356,12 @@ fun app() {
                             1 -> {
                                 circlesToDraw.remove(lastAction.data as Int)
                                 nodeCounter--
-                                graph.removeNode(lastAction.data)
+                                wdgraph.removeNode(lastAction.data)
                             }
                             2 -> {
                                 val (start, end) = lastAction.data as Pair<*, *>
                                 linesToDraw.remove(Pair(start, end))
-                                graph.removeEdge(start as Int, end as Int)
+                                wdgraph.removeEdge(start as Int, end as Int)
                             }
                             // Добавьте обработку для других типов действий, если они есть
                         }
@@ -349,54 +371,98 @@ fun app() {
                     false
                 }
             }
+            .onPointerEvent(PointerEventType.Scroll){
+                if (it.changes.first().scrollDelta.y > 0){
+                    circleRadius = (circleRadius.value -  0.3F).toDp()
+                    if (circleRadius.value < 4){
+                        circleRadius = 4.dp
+                    }
+                }
+                else{
+                    circleRadius = (circleRadius.value +  0.3F).toDp()
+                    if (circleRadius.value > 25){
+                        circleRadius = 25.dp
+                    }
+                }
+            }
             .pointerInput(Unit) {
                 detectTapGestures(onTap = { offset ->
                     bridges.value = listOf()
-                    when (selectedOption) {
-                        1 -> {
-                            actionStack.add(Action(1, nodeCounter))
-                            circlesToDraw = circlesToDraw.toMutableMap().apply { this[nodeCounter] = Pair(offset.x.toDp(), offset.y.toDp()) }
-                            println(offset)
-                            graph.addNode(nodeCounter)
-                            nodeCounter += 1
-                        }
-
-                        2 -> {
-                            val hitCircle = findInMap(circlesToDraw, circleRadius, offset)
-                            if (hitCircle != null) {
-                                if (startConnectingPoint == null) {
-                                    startConnectingPoint = hitCircle
-                                } else if (endConnectingPoint == null && startConnectingPoint != hitCircle) {
-                                    endConnectingPoint = hitCircle
-                                    if (!(Pair(endConnectingPoint, startConnectingPoint) in linesToDraw || Pair(
-                                            startConnectingPoint,
-                                            endConnectingPoint
-                                        ) in linesToDraw)
-                                    ) {
-                                        actionStack.add(Action(2, Pair(startConnectingPoint!!, endConnectingPoint!!)))
-                                        linesToDraw = linesToDraw.toMutableMap().apply {
-                                            this[Pair(startConnectingPoint!!, endConnectingPoint!!)] =
-                                                Pair(circlesToDraw[startConnectingPoint]!!, circlesToDraw[endConnectingPoint]!!)
-                                        }
-                                        graph.addEdge(startConnectingPoint!!, endConnectingPoint!!)
-                                    }
+                    shortWayFB.value = listOf()
+                    if(isNodesToFindWay.value){
+                        val hitCircle = findInMap(circlesToDraw, circleRadius, offset)
+                        if (hitCircle != null) {
+                            if (startConnectingPoint == null) {
+                                startConnectingPoint = hitCircle
+                            } else if (endConnectingPoint == null && startConnectingPoint != hitCircle) {
+                                endConnectingPoint = hitCircle
+                                val temp = wdgraph.shortestPath(startConnectingPoint!!, endConnectingPoint!!)
+                                if (temp != null){
+                                    shortWayFB.value = temp
                                     startConnectingPoint = null
                                     endConnectingPoint = null
-                                } else {
+                                    isNodesToFindWay.value = false
+                                }
+                                else{
                                     startConnectingPoint = null
                                     endConnectingPoint = null
                                 }
+                            } else {
+                                startConnectingPoint = null
+                                endConnectingPoint = null
                             }
                         }
-
-
-                        4 -> {
-                            selectedCircle = findInMap(circlesToDraw, circleRadius, offset)
+                        else{
+                            isNodesToFindWay.value = false
                         }
+                    }
+                    else{
+                        when (selectedOption) {
+                            1 -> {
+                                actionStack.add(Action(1, nodeCounter))
+                                circlesToDraw = circlesToDraw.toMutableMap().apply { this[nodeCounter] = Pair(offset.x.toDp(), offset.y.toDp()) }
+                                println(offset)
+                                wdgraph.addNode(nodeCounter)
+                                nodeCounter += 1
+                            }
+
+                            2 -> {
+                                val hitCircle = findInMap(circlesToDraw, circleRadius, offset)
+                                if (hitCircle != null) {
+                                    if (startConnectingPoint == null) {
+                                        startConnectingPoint = hitCircle
+                                    } else if (endConnectingPoint == null && startConnectingPoint != hitCircle) {
+                                        endConnectingPoint = hitCircle
+                                        if (!(Pair(endConnectingPoint, startConnectingPoint) in linesToDraw || Pair(
+                                                startConnectingPoint,
+                                                endConnectingPoint
+                                            ) in linesToDraw)
+                                        ) {
+                                            actionStack.add(Action(2, Pair(startConnectingPoint!!, endConnectingPoint!!)))
+                                            linesToDraw = linesToDraw.toMutableMap().apply {
+                                                this[Pair(startConnectingPoint!!, endConnectingPoint!!)] =
+                                                    Pair(circlesToDraw[startConnectingPoint]!!, circlesToDraw[endConnectingPoint]!!)
+                                            }
+                                            wdgraph.addEdge(startConnectingPoint!!, endConnectingPoint!!, 1)
+                                        }
+                                        startConnectingPoint = null
+                                        endConnectingPoint = null
+                                    } else {
+                                        startConnectingPoint = null
+                                        endConnectingPoint = null
+                                    }
+                                }
+                            }
+
+
+                            4 -> {
+                                selectedCircle = findInMap(circlesToDraw, circleRadius, offset)
+                            }
 
 //                        3 -> {
 //                            selectedCircleToMove = findInMap(circles, circleRadius, offset)
 //                        }
+                        }
                     }
                 })
             }.onSizeChanged { newSize ->
@@ -467,6 +533,7 @@ fun app() {
                 }
             })
         {
+            val shortway =makeLineKeysFromList(shortWayFB.value)
             Canvas(modifier = Modifier.align(Alignment.TopStart)) {
                 val canvasWidth = size.width
                 val canvasHeight = size.height
@@ -475,6 +542,9 @@ fun app() {
                     var col = colorStates[4]
                     if (Pair(key.first, key.second) in bridges.value || Pair(key.second, key.first) in bridges.value){
                         col = Color.Magenta
+                    }
+                    if (Pair(key.first, key.second) in shortway || Pair(key.second, key.first) in shortway){
+                        col = Color.Green
                     }
                     drawLine(
                         color = col,
@@ -486,8 +556,15 @@ fun app() {
 
                 // Отрисовка кругов
                 for ((key, value) in circlesToDraw) {
+                    var col = colorStates[1]
+                    if (shortWayFB.value.isNotEmpty() && (key == shortWayFB.value.first() || key == shortWayFB.value.last())){
+                        col = Color.Cyan
+                    }
+                    else if (key in shortWayFB.value){
+                        col = Color.Blue
+                    }
                     drawCircle(
-                        color = colorStates[1],
+                        color = col,
                         radius = circleRadius.value,
                         center = Offset(value.first.value - canvasWidth / 2, value.second.value - canvasHeight / 2),
                         style = Fill
@@ -501,6 +578,9 @@ fun app() {
                             style = Stroke(width = 2.dp.toPx())
                         )
                     }
+                    //drawText(
+                    //    textLayoutResult = TextLayoutResult(layoutInput=(),)
+                    //)
                 }
 
             }
@@ -547,8 +627,8 @@ fun main() = application {
             mainScreen(onStartClick = { showMainScreen = false })
         }
     } else {
-            Window(onCloseRequest = ::exitApplication, state = WindowState(size = windowSize)) {
-        app()
+        Window(onCloseRequest = ::exitApplication, state = WindowState(size = windowSize)) {
+            app()
         }
     }
 }
