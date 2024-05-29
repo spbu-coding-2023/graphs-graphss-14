@@ -1,5 +1,7 @@
 package algos
 import kotlin.math.sqrt
+import java.awt.Color
+import java.util.*
 
 open class Graph {
     val nodes = mutableListOf<Int>()
@@ -18,6 +20,7 @@ open class Graph {
             adjacencyList[m]?.add(n)
         }
     }
+
     fun removeNode(n: Int) {
         nodes.remove(n)
         adjacencyList.remove(n)
@@ -26,12 +29,14 @@ open class Graph {
             neighbors.remove(n)
         }
     }
-    fun removeEdge(n:Int, m:Int){
-        edges.remove(Pair(n,m))
-        edges.remove(Pair(m,n))
+
+    fun removeEdge(n: Int, m: Int) {
+        edges.remove(Pair(n, m))
+        edges.remove(Pair(m, n))
         adjacencyList[n]?.remove(m)
         adjacencyList[m]?.remove(n)
     }
+
     fun findBridges(): List<Pair<Int, Int>> {
         val bridges = mutableListOf<Pair<Int, Int>>()
         val visited = mutableSetOf<Int>()
@@ -66,7 +71,8 @@ open class Graph {
 
         return bridges
     }
-    fun printAll(){
+
+    fun printAll() {
         println(nodes)
         println(edges)
     }
@@ -97,7 +103,8 @@ open class Graph {
                         val deltaY = layout[node]!!.second - layout[neighbor]!!.second
                         val distance = sqrt(deltaX * deltaX + deltaY * deltaY)
                         val repulsion = smoothingFactor * smoothingFactor / distance // Сила отталкивания
-                        forces[node] = Pair(forces[node]!!.first + repulsion * deltaX, forces[node]!!.second + repulsion * deltaY)
+                        forces[node] =
+                            Pair(forces[node]!!.first + repulsion * deltaX, forces[node]!!.second + repulsion * deltaY)
                     }
                 }
 
@@ -121,24 +128,74 @@ open class Graph {
     }
 }
 
-fun main() {
-    val graph = Graph()
-// Adding vertices and edges to the graph
-graph.addNode(1)
-graph.addNode(2)
-graph.addNode(3)
-graph.addNode(4)
-graph.addNode(5)
-graph.addNode(6)
-graph.addNode(7)
-graph.addEdge(1,1,)
-graph.addEdge(2,1,)
-graph.addEdge(3,1,)
-graph.addEdge(4,3,)
-graph.addEdge(5,2,)
-graph.addEdge(1,5,)
-    val layout = Graph.SpringEmbedder().layout(graph)
-    for ((node, position) in layout) {
-        println("Node $node is at position $position")
+
+    class ClusteredGraph : Graph() {
+        private val clusters = mutableListOf<MutableSet<Int>>()
+        private val colors = mutableMapOf<Int, Color>()
+
+        fun clusterGraph() {
+            val visited = mutableSetOf<Int>()
+
+            fun dfs(node: Int, cluster: MutableSet<Int>) {
+                visited.add(node)
+                cluster.add(node)
+                for (neighbor in adjacencyList[node] ?: emptyList()) {
+                    if (!visited.contains(neighbor)) {
+                        dfs(neighbor, cluster)
+                    }
+                }
+            }
+
+            for (node in nodes) {
+                if (!visited.contains(node)) {
+                    val cluster = mutableSetOf<Int>()
+                    dfs(node, cluster)
+                    clusters.add(cluster)
+                }
+            }
+        }
+
+        fun colorClusters() {
+            val random = Random()
+            for (cluster in clusters) {
+                val color = Color(random.nextInt(256), random.nextInt(256), random.nextInt(256))
+                for (node in cluster) {
+                    colors[node] = color
+                }
+            }
+        }
+
+        fun printColoredClusters() {
+            for ((node, color) in colors) {
+                println("Node $node has color $color")
+            }
+        }
+
+        fun getColors(): Map<Int, Color> {
+            return colors
+        }
     }
-}
+
+    fun main() {
+        val graph = ClusteredGraph()
+        graph.addNode(1)
+        graph.addNode(2)
+        graph.addNode(3)
+        graph.addNode(4)
+        graph.addNode(5)
+        graph.addNode(6)
+        graph.addNode(7)
+
+        graph.addEdge(1, 2)
+        graph.addEdge(2, 3)
+        graph.addEdge(3, 1)
+        graph.addEdge(4, 5)
+        graph.addEdge(5, 6)
+        graph.addEdge(6, 4)
+        graph.addEdge(7, 7) // Self-loop
+
+        graph.clusterGraph()
+        graph.colorClusters()
+        graph.printColoredClusters()
+    }
+
