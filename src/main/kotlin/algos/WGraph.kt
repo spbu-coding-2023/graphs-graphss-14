@@ -1,7 +1,7 @@
 package algos
 
 class WGraph : Graph() {
-    private val weights = mutableMapOf<Pair<Int, Int>, Int>()
+    val weights = mutableMapOf<Pair<Int, Int>, Int>()
 
     fun addEdge(n: Int, m: Int, weight: Int) {
         super.addEdge(n, m)
