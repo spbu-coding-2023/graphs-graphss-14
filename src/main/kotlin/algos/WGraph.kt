@@ -11,7 +11,7 @@ class WGraph : Graph() {
         weights[Pair(m, n)] = weight // Если граф ненаправленный
     }
 
-    fun shortestPath(source: Int, target: Int): List<Int>? {
+    fun shortestPathBF(source: Int, target: Int): List<Int>? {
         val distance = mutableMapOf<Int, Int>()
         val predecessor = mutableMapOf<Int, Int?>()
 
