@@ -1,7 +1,7 @@
 package algos
 
 open class Graph {
-    private val nodes = mutableListOf<Int>()
+    val nodes = mutableListOf<Int>()
     val edges = mutableListOf<Pair<Int, Int>>()
     val adjacencyList = mutableMapOf<Int, MutableList<Int>>()
 
