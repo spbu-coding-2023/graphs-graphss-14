@@ -1,5 +1,7 @@
 package algos
 
+import java.util.*
+
 class WGraph : Graph() {
     val weights = mutableMapOf<Pair<Int, Int>, Int>()
 
@@ -42,6 +44,40 @@ class WGraph : Graph() {
         }
 
         // Восстановление пути
+        val path = mutableListOf<Int>()
+        var currentNode: Int? = target
+        while (currentNode != null) {
+            path.add(currentNode)
+            currentNode = predecessor[currentNode]
+        }
+        return if (path.last() == source) path.asReversed() else null
+    }
+    fun shortestPathD(source: Int, target: Int): List<Int>? {
+        val distance = mutableMapOf<Int, Int>()
+        val predecessor = mutableMapOf<Int, Int?>()
+        val queue = PriorityQueue<Int>(compareBy { distance[it] })
+
+        for (node in adjacencyList.keys) {
+            distance[node] = Int.MAX_VALUE
+            predecessor[node] = null
+            queue.add(node)
+        }
+        distance[source] = 0
+
+        while (queue.isNotEmpty()) {
+            val u = queue.poll()
+            for (v in adjacencyList[u] ?: emptyList()) {
+                val edgeWeight = weights[Pair(u, v)] ?: Int.MAX_VALUE
+                if (distance[u] != Int.MAX_VALUE && distance[u]!! + edgeWeight < distance[v]!!) {
+                    distance[v] = distance[u]!! + edgeWeight
+                    predecessor[v] = u
+                    queue.remove(v) // Delete and restore back to update the order in the queue
+                    queue.add(v)
+                }
+            }
+        }
+
+        // Restore path
         val path = mutableListOf<Int>()
         var currentNode: Int? = target
         while (currentNode != null) {
