@@ -1,7 +1,8 @@
 package algos
-import kotlin.math.sqrt
-import java.awt.Color
+import androidx.compose.ui.graphics.Color
 import java.util.*
+import kotlin.collections.ArrayDeque
+import kotlin.math.sqrt
 
 open class Graph {
     val nodes = mutableListOf<Int>()
@@ -20,7 +21,6 @@ open class Graph {
             adjacencyList[m]?.add(n)
         }
     }
-
     fun removeNode(n: Int) {
         nodes.remove(n)
         adjacencyList.remove(n)
@@ -29,14 +29,12 @@ open class Graph {
             neighbors.remove(n)
         }
     }
-
-    fun removeEdge(n: Int, m: Int) {
-        edges.remove(Pair(n, m))
-        edges.remove(Pair(m, n))
+    fun removeEdge(n:Int, m:Int){
+        edges.remove(Pair(n,m))
+        edges.remove(Pair(m,n))
         adjacencyList[n]?.remove(m)
         adjacencyList[m]?.remove(n)
     }
-
     fun findBridges(): List<Pair<Int, Int>> {
         val bridges = mutableListOf<Pair<Int, Int>>()
         val visited = mutableSetOf<Int>()
@@ -71,13 +69,12 @@ open class Graph {
 
         return bridges
     }
-
-    fun printAll() {
+    fun printAll(){
         println(nodes)
         println(edges)
     }
 
-    class SpringEmbedder {
+    open class SpringEmbedder {
         private val smoothingFactor = 0.1
         private val iterations = 500
         private val temperature = 0.9
@@ -103,8 +100,7 @@ open class Graph {
                         val deltaY = layout[node]!!.second - layout[neighbor]!!.second
                         val distance = sqrt(deltaX * deltaX + deltaY * deltaY)
                         val repulsion = smoothingFactor * smoothingFactor / distance // Сила отталкивания
-                        forces[node] =
-                            Pair(forces[node]!!.first + repulsion * deltaX, forces[node]!!.second + repulsion * deltaY)
+                        forces[node] = Pair(forces[node]!!.first + repulsion * deltaX, forces[node]!!.second + repulsion * deltaY)
                     }
                 }
 
@@ -126,76 +122,65 @@ open class Graph {
             return layout
         }
     }
-}
 
+    fun betweennessCentrality(): Map<Int, Float> {
+        val betweenness = mutableMapOf<Int, Float>()
+        val stack = mutableListOf<Int>()
+        val predecessors = mutableMapOf<Int, MutableList<Int>>()
+        val sigma = mutableMapOf<Int, Int>()
+        val delta = mutableMapOf<Int, Double>()
 
-    class ClusteredGraph : Graph() {
-        private val clusters = mutableListOf<MutableSet<Int>>()
-        private val colors = mutableMapOf<Int, Color>()
+        fun shortestPaths(source: Int) {
+            val dist = mutableMapOf<Int, Int>()
+            val queue = ArrayDeque<Int>()
+            dist[source] = 0
+            sigma[source] = 1
+            queue.add(source)
 
-        fun clusterGraph() {
-            val visited = mutableSetOf<Int>()
-
-            fun dfs(node: Int, cluster: MutableSet<Int>) {
-                visited.add(node)
-                cluster.add(node)
-                for (neighbor in adjacencyList[node] ?: emptyList()) {
-                    if (!visited.contains(neighbor)) {
-                        dfs(neighbor, cluster)
+            while (queue.isNotEmpty()) {
+                val v = queue.removeFirst()
+                stack.add(v)
+                for (w in adjacencyList[v] ?: emptyList()) {
+                    if (dist.getOrDefault(w, Int.MAX_VALUE) == Int.MAX_VALUE) {
+                        queue.add(w)
+                        dist[w] = dist.getOrDefault(v, 0) + 1
+                    }
+                    if (dist[w] == dist.getOrDefault(v, 0) + 1) {
+                        sigma[w] = sigma.getOrDefault(w, 0) + sigma.getOrDefault(v, 0)
+                        predecessors.getOrPut(w) { mutableListOf() }.add(v)
                     }
                 }
             }
+        }
 
-            for (node in nodes) {
-                if (!visited.contains(node)) {
-                    val cluster = mutableSetOf<Int>()
-                    dfs(node, cluster)
-                    clusters.add(cluster)
+        fun accumulateBetweenness(source: Int) {
+            val dependency = mutableMapOf<Int, Float>()
+            while (stack.isNotEmpty()) {
+                val w = stack.removeLast()
+                for (v in predecessors[w] ?: emptyList()) {
+                    dependency[v] = dependency.getOrDefault(v, 0.0F) + (sigma.getOrDefault(v, 0) / sigma.getOrDefault(w, 1).toFloat()) * (1 + dependency.getOrDefault(w, 0.0F))
+                }
+                if (w != source) {
+                    betweenness[w] = betweenness.getOrDefault(w, 0.0F) + dependency.getOrDefault(w, 0.0F)
                 }
             }
         }
 
-        fun colorClusters() {
-            val random = Random()
-            for (cluster in clusters) {
-                val color = Color(random.nextInt(256), random.nextInt(256), random.nextInt(256))
-                for (node in cluster) {
-                    colors[node] = color
-                }
-            }
+        for (source in nodes) {
+            shortestPaths(source)
+            accumulateBetweenness(source)
+            sigma.clear()
+            predecessors.clear()
         }
 
-        fun printColoredClusters() {
-            for ((node, color) in colors) {
-                println("Node $node has color $color")
-            }
+        val n = nodes.size
+        for ((node, bc) in betweenness) {
+            betweenness[node] = (bc / ((n - 1) * (n - 2) / 2.0)).toFloat()
         }
 
-        fun getColors(): Map<Int, Color> {
-            return colors
-        }
+        return betweenness
     }
 
-    fun main() {
-        val graph = ClusteredGraph()
-        graph.addNode(1)
-        graph.addNode(2)
-        graph.addNode(3)
-        graph.addNode(4)
-        graph.addNode(5)
-        graph.addNode(6)
-        graph.addNode(7)
 
-        graph.addEdge(1, 2)
-        graph.addEdge(2, 3)
-        graph.addEdge(3, 1)
-        graph.addEdge(4, 5)
-        graph.addEdge(5, 6)
-        graph.addEdge(6, 4)
-        graph.addEdge(7, 7) // Self-loop
 
-        graph.clusterGraph()
-        graph.colorClusters()
-        graph.printColoredClusters()
-    }
-
+}
