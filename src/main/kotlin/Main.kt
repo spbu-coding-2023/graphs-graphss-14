@@ -25,16 +25,16 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.drawText
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.*
 import androidx.compose.ui.window.*
-import java.awt.font.TextLayout
 import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.random.Random
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.application
+import kotlin.math.min
 
 data class nodeParameters(val colorNode: Color, val int2: Int)
 
@@ -63,6 +63,9 @@ fun app() {
     var windowHeight by remember { mutableStateOf(windowState.size.height) }
     var windowWidth by remember { mutableStateOf(windowState.size.width) }
     var circlesToDraw by remember { mutableStateOf(mutableMapOf<Int, Pair<Dp, Dp>>()) }
+    var colorsForBeetweenes by remember { mutableStateOf(mapOf<Int, Float>()) }
+    var colorsForClusters by remember { mutableStateOf(mapOf<Int, Color>()) }
+    var isColorsForClusters by remember { mutableStateOf(false) }
     var linesToDraw by remember { mutableStateOf(mutableMapOf<Pair<Int, Int>, Pair<Pair<Dp, Dp>, Pair<Dp, Dp>>>()) }
     val wdgraph = remember{ WGraph() }
 
@@ -70,7 +73,8 @@ fun app() {
     val graph = remember{ Graph() }
     val bridges = remember {  mutableStateOf(listOf<Pair<Int,Int>>())}
     val isNodesToFindWay = remember { mutableStateOf(false) }
-    val shortWayFB = remember {  mutableStateOf(listOf<Int>())}
+    val isNodesToFindWayD = remember { mutableStateOf(false) }
+    val shortestWay = remember {  mutableStateOf(listOf<Int>())}
     val shortWayKeysLines = remember {  mutableStateOf(listOf<Int>())}
 
     var selectedCircle by remember { mutableStateOf<Int?>(null) }
@@ -85,6 +89,7 @@ fun app() {
     var additionalOptionsGroup2 by remember { mutableStateOf(false) }
     var additionalOptionsGroup3 by remember { mutableStateOf(false) }
     var openSettings by remember { mutableStateOf(false) }
+    var isColorsForBeetweenes by remember { mutableStateOf(false) }
     var switchState by remember { mutableStateOf(false) }
     var turnBack by remember { mutableStateOf(false) }
     val colorStates by remember { mutableStateOf(mutableListOf(Color.White, Color.Red, Color.Blue, Color.Gray, Color.Black)) }
@@ -117,11 +122,12 @@ fun app() {
         ) {
             IconButton(onClick = {
                 isNodesToFindWay.value = false
+                isNodesToFindWayD.value = false
                 expanded = true
                 additionalOptionsGroup1 = false
                 additionalOptionsGroup2 = false
                 bridges.value = listOf()
-                shortWayFB.value = listOf()
+                shortestWay.value = listOf()
                 additionalOptionsGroup3 = false
             }) {
                 Image(
@@ -145,7 +151,7 @@ fun app() {
                     additionalOptionsGroup2 = false
                     additionalOptionsGroup3 = false
                 }) {
-                    Text("Option 1", color=colorStates[4])
+                    Text("Основная группа", color=colorStates[4])
                 }
                 if (additionalOptionsGroup1) {
                     DropdownMenuItem(onClick = {
@@ -161,21 +167,43 @@ fun app() {
                         expanded = false
                         additionalOptionsGroup1 = false
                     }) {
-                        Text("Разложить граф", color=colorStates[4])
+                        Text("Разложить граф случайно", color=colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
-                        println("Additional Option 2 clicked")
+                        val qwerty = Graph.SpringEmbedder().layout(wdgraph)
+                        //tyt raskladka norm doljna bit
+                        circlesToDraw.forEach{ (key, _) ->
+                            circlesToDraw[key] = Pair(Dp(qwerty[key]!!.first.toFloat() * windowWidth.value / 20 + windowWidth.value / 2),
+                                Dp(qwerty[key]!!.second.toFloat() * windowHeight.value / 20 + windowHeight.value/2))
+                        }
+                        linesToDraw.forEach{ (key, _) ->
+                            linesToDraw[key] = Pair(circlesToDraw[key.first]!!, circlesToDraw[key.second]!!)
+                        }
+                        //tyt raskladka norm doljna bit
                         expanded = false
                         additionalOptionsGroup1 = false
                     }) {
-                        Text("Additional Option 2", color=colorStates[4])
+                        Text("Разложить граф случайно по умному", color=colorStates[4])
+                    }
+                    DropdownMenuItem(onClick = {
+                        println("Additional Option 2 clicked")
+                        colorsForBeetweenes = wdgraph.betweennessCentrality()
+                        println(colorsForBeetweenes)
+                        isColorsForBeetweenes = true
+                        expanded = false
+                        additionalOptionsGroup1 = false
+                    }) {
+                        Text("Ключевые вершины", color=colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
                         println("Additional Option 3 clicked")
                         expanded = false
-                        additionalOptionsGroup1 = false
+                        //colorsForClusters = Graph.ClusteredGraph.
+//                        //graph.clusterGraph()
+//                        //graph.colorClusters()
+                        //additionalOptionsGroup1 = false
                     }) {
-                        Text("Additional Option 3", color=colorStates[4])
+                        Text("Выделение сообществ", color=colorStates[4])
                     }
                 }
                 DropdownMenuItem(onClick = {
@@ -229,9 +257,10 @@ fun app() {
                     DropdownMenuItem(onClick = {
                         println("Additional Option 2 clicked")
                         expanded = false
+                        isNodesToFindWayD.value = true
                         additionalOptionsGroup3 = false
                     }) {
-                        Text("Additional Option 2", color=colorStates[4])
+                        Text("Путь между вершинами (Дейкстра)", color=colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
                         println("Additional Option 3 clicked")
@@ -388,20 +417,28 @@ fun app() {
             .pointerInput(Unit) {
                 detectTapGestures(onTap = { offset ->
                     bridges.value = listOf()
-                    shortWayFB.value = listOf()
-                    if(isNodesToFindWay.value){
+                    isColorsForBeetweenes = false
+                    shortestWay.value = listOf()
+                    if(isNodesToFindWay.value || isNodesToFindWayD.value){
                         val hitCircle = findInMap(circlesToDraw, circleRadius, offset)
                         if (hitCircle != null) {
                             if (startConnectingPoint == null) {
                                 startConnectingPoint = hitCircle
                             } else if (endConnectingPoint == null && startConnectingPoint != hitCircle) {
                                 endConnectingPoint = hitCircle
-                                val temp = wdgraph.shortestPath(startConnectingPoint!!, endConnectingPoint!!)
+                                val temp : List<Int>?
+                                if (isNodesToFindWayD.value){
+                                    temp = wdgraph.shortestPathD(startConnectingPoint!!, endConnectingPoint!!)
+                                }
+                                else{
+                                    temp = wdgraph.shortestPathBF(startConnectingPoint!!, endConnectingPoint!!)
+                                }
                                 if (temp != null){
-                                    shortWayFB.value = temp
+                                    shortestWay.value = temp
                                     startConnectingPoint = null
                                     endConnectingPoint = null
                                     isNodesToFindWay.value = false
+                                    isNodesToFindWayD.value = false
                                 }
                                 else{
                                     startConnectingPoint = null
@@ -414,6 +451,7 @@ fun app() {
                         }
                         else{
                             isNodesToFindWay.value = false
+                            isNodesToFindWayD.value = false
                         }
                     }
                     else{
@@ -533,7 +571,7 @@ fun app() {
                 }
             })
         {
-            val shortway =makeLineKeysFromList(shortWayFB.value)
+            val shortway =makeLineKeysFromList(shortestWay.value)
             Canvas(modifier = Modifier.align(Alignment.TopStart)) {
                 val canvasWidth = size.width
                 val canvasHeight = size.height
@@ -557,10 +595,15 @@ fun app() {
                 // Отрисовка кругов
                 for ((key, value) in circlesToDraw) {
                     var col = colorStates[1]
-                    if (shortWayFB.value.isNotEmpty() && (key == shortWayFB.value.first() || key == shortWayFB.value.last())){
+                    if (isColorsForBeetweenes){
+
+                        col = Color( red=min((127F+ 255 * colorsForBeetweenes[key]!! / 2).toInt(),255 ) ,0,0)
+                    }
+
+                    else if (shortestWay.value.isNotEmpty() && (key == shortestWay.value.first() || key == shortestWay.value.last())){
                         col = Color.Cyan
                     }
-                    else if (key in shortWayFB.value){
+                    else if (key in shortestWay.value){
                         col = Color.Blue
                     }
                     drawCircle(
@@ -592,6 +635,17 @@ fun app() {
                     content = {
                         Box(modifier = Modifier.padding(1.dp).fillMaxSize().background(colorStates[0]), contentAlignment = Alignment.Center) {
                             Text("Всплывающее окно", color=colorStates[4])
+                            Button(onClick = {
+                                //wdgraph.removeNode(key)
+                                //circlesToDraw.remove(key)
+                                //val newLinesToDraw = linesToDraw.filterNot { (k, _) ->
+                                //    k.first == key || k.second == key
+                                //}
+
+                                //linesToDraw = newLinesToDraw as MutableMap<Pair<Int, Int>, Pair<Pair<Dp, Dp>, Pair<Dp, Dp>>>
+                            }){
+                                Text("Удалить вершину", color=colorStates[4])
+                            }
                         }
                     }
                 )
@@ -613,6 +667,7 @@ fun mainScreen(onStartClick: () -> Unit) {
         Button(onClick = { /* Handle other button click */ }) {
             Text("Other Option")
         }
+
     }
 }
 
