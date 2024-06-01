@@ -58,7 +58,6 @@ private val logger = KotlinLogging.logger {}
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun app() {
-
     val windowState = rememberWindowState()
     val density = LocalDensity.current
     var windowSize by remember { mutableStateOf(windowState.size) }
@@ -67,7 +66,7 @@ fun app() {
     var circlesToDraw by remember { mutableStateOf(mutableMapOf<Int, Pair<Dp, Dp>>()) }
     var colorsForBeetweenes by remember { mutableStateOf(mapOf<Int, Float>()) }
     var linesToDraw by remember { mutableStateOf(mutableMapOf<Pair<Int, Int>, Pair<Pair<Dp, Dp>, Pair<Dp, Dp>>>()) }
-    val wdgraph = remember { WGraph() }
+    val wgraph = remember { WGraph() }
 
 
     val bridges = remember { mutableStateOf(listOf<Pair<Int, Int>>()) }
@@ -181,7 +180,7 @@ fun app() {
                         Text("Разложить граф случайно", color = colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
-                        val qwerty = Graph.SpringEmbedder().layout(wdgraph)
+                        val qwerty = Graph.SpringEmbedder().layout(wgraph)
                         //tyt raskladka norm doljna bit
                         circlesToDraw.forEach { (key, _) ->
                             circlesToDraw[key] = Pair(
@@ -200,7 +199,7 @@ fun app() {
                     }
                     DropdownMenuItem(onClick = {
                         logger.info{"Additional Option 2 clicked"}
-                        colorsForBeetweenes = wdgraph.betweennessCentrality()
+                        colorsForBeetweenes = wgraph.betweennessCentrality()
                         logger.info { colorsForBeetweenes}
 
                         isColorsForBeetweenes = true
@@ -226,7 +225,7 @@ fun app() {
                     additionalOptionsGroup1 = false
                     additionalOptionsGroup3 = false
                 }) {
-                    Text("Option 2", color = colorStates[4])
+                    Text("Группа алгоритмов 1", color = colorStates[4])
                 }
                 if (additionalOptionsGroup2) {
                     DropdownMenuItem(onClick = {
@@ -234,13 +233,13 @@ fun app() {
                         expanded = false
                         additionalOptionsGroup2 = false
                     }) {
-                        Text("Additional Option 1", color = colorStates[4])
+                        Text("Выделение компонент сильной связности", color = colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
                         logger.info{"Additional Option 2 clicked"}
                         expanded = false
                         additionalOptionsGroup2 = false
-                        bridges.value = wdgraph.findBridges()
+                        bridges.value = wgraph.findBridges()
                     }) {
                         Text("Поиск мостов", color = colorStates[4])
                     }
@@ -249,7 +248,7 @@ fun app() {
                         expanded = false
                         additionalOptionsGroup2 = false
                     }) {
-                        Text("Additional Option 3", color = colorStates[4])
+                        Text("Поиск циклов для заданной вершины", color = colorStates[4])
                     }
                 }
                 DropdownMenuItem(onClick = {
@@ -258,7 +257,7 @@ fun app() {
                     additionalOptionsGroup1 = false
                     additionalOptionsGroup2 = false
                 }) {
-                    Text("Option 3", color = colorStates[4])
+                    Text("Группа алгоритмов 2", color = colorStates[4])
                 }
                 if (additionalOptionsGroup3) {
                     DropdownMenuItem(onClick = {
@@ -266,7 +265,7 @@ fun app() {
                         expanded = false
                         additionalOptionsGroup3 = false
                     }) {
-                        Text("Additional Option 1", color = colorStates[4])
+                        Text("Построение минимального остовного дерева", color = colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
                         logger.info{"Additional Option 2 clicked"}
@@ -287,13 +286,18 @@ fun app() {
                 }
                 DropdownMenuItem(onClick = {
                     logger.info{"settings"}
+                    expanded = false
                     openSettings = true
                 }) {
                     Text("settings", color = colorStates[4])
                 }
                 if (openSettings) {
+
                     DialogWindow(onCloseRequest = { openSettings = false },
-                        state = DialogState(position = WindowPosition(200.dp, 200.dp)),
+                        focusable = false,
+                        enabled = true,
+                        title = "settings",
+                        state = DialogState(position = WindowPosition(windowWidth / 2, windowHeight/ 2)),
                         content = {
                             Box(
                                 modifier = Modifier.padding(1.dp).fillMaxSize().background(colorStates[0]),
@@ -314,6 +318,7 @@ fun app() {
                             }
                         }
                     )
+
                 }
             }
             RadioButton(
@@ -374,13 +379,13 @@ fun app() {
                         1 -> {
                             circlesToDraw.remove(lastAction.data as Int)
                             nodeCounter--
-                            wdgraph.removeNode(lastAction.data)
+                            wgraph.removeNode(lastAction.data)
                         }
 
                         2 -> {
                             val (start, end) = lastAction.data as Pair<*, *>
                             linesToDraw.remove(Pair(start, end))
-                            wdgraph.removeEdge(start as Int, end as Int)
+                            wgraph.removeEdge(start as Int, end as Int)
                         }
                         // Добавьте обработку для других типов действий, если они есть
                     }
@@ -403,13 +408,13 @@ fun app() {
                             1 -> {
                                 circlesToDraw.remove(lastAction.data as Int)
                                 nodeCounter--
-                                wdgraph.removeNode(lastAction.data)
+                                wgraph.removeNode(lastAction.data)
                             }
 
                             2 -> {
                                 val (start, end) = lastAction.data as Pair<*, *>
                                 linesToDraw.remove(Pair(start, end))
-                                wdgraph.removeEdge(start as Int, end as Int)
+                                wgraph.removeEdge(start as Int, end as Int)
                             }
                             // Добавьте обработку для других типов действий, если они есть
                         }
@@ -445,9 +450,9 @@ fun app() {
                             } else if (endConnectingPoint == null && startConnectingPoint != hitCircle) {
                                 endConnectingPoint = hitCircle
                                 val temp: List<Int>? = if (isNodesToFindWayD.value) {
-                                    wdgraph.shortestPathD(startConnectingPoint!!, endConnectingPoint!!)
+                                    wgraph.shortestPathD(startConnectingPoint!!, endConnectingPoint!!)
                                 } else {
-                                    wdgraph.shortestPathBF(startConnectingPoint!!, endConnectingPoint!!)
+                                    wgraph.shortestPathBF(startConnectingPoint!!, endConnectingPoint!!)
                                 }
                                 if (temp != null) {
                                     shortestWay.value = temp
@@ -474,7 +479,7 @@ fun app() {
                                 circlesToDraw = circlesToDraw.toMutableMap()
                                     .apply { this[nodeCounter] = Pair(offset.x.toDp(), offset.y.toDp()) }
                                 logger.info{offset}
-                                wdgraph.addNode(nodeCounter)
+                                wgraph.addNode(nodeCounter)
                                 nodeCounter += 1
                             }
 
@@ -503,7 +508,7 @@ fun app() {
                                                         circlesToDraw[endConnectingPoint]!!
                                                     )
                                             }
-                                            wdgraph.addEdge(startConnectingPoint!!, endConnectingPoint!!, 1)
+                                            wgraph.addEdge(startConnectingPoint!!, endConnectingPoint!!, 1)
                                         }
                                         startConnectingPoint = null
                                         endConnectingPoint = null
@@ -692,6 +697,35 @@ fun app() {
             }
         }
     }
+    if (openSettings) {
+
+        DialogWindow(onCloseRequest = { openSettings = false },
+            focusable = false,
+            enabled = true,
+            title = "settings",
+            state = DialogState(position = WindowPosition(windowWidth / 2, windowHeight/ 2)),
+            content = {
+                Box(
+                    modifier = Modifier.padding(1.dp).fillMaxSize().background(colorStates[0]),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column {
+                        Text("This is a settings", color = colorStates[4])
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Dark theme:", color = colorStates[4])
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Switch(
+                                checked = switchState,
+                                onCheckedChange = { switchState = it }
+                            )
+                        }
+                    }
+                }
+            }
+        )
+
+    }
 }
 
 @Composable
@@ -705,13 +739,14 @@ fun mainScreen(onStartClick: () -> Unit) {
             Text("Start")
         }
         Button(onClick = { /* Handle other button click */ }) {
-            Text("Other Option")
+            Text("Load save")
         }
 
     }
 }
 
 fun main() = application {
+
     val density = LocalDensity.current
     val windowSize = with(density) { DpSize(800.dp.value.toInt().toDp(), 600.dp.value.toInt().toDp()) }
 
@@ -722,7 +757,7 @@ fun main() = application {
             mainScreen(onStartClick = { showMainScreen = false })
         }
     } else {
-        Window(onCloseRequest = ::exitApplication, state = WindowState(size = windowSize)) {
+        Window(onCloseRequest = ::exitApplication, state = WindowState(size = windowSize), title = "The best graph visualizator", focusable = true) {
             app()
         }
     }
