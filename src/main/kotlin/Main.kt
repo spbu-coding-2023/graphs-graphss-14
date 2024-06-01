@@ -155,7 +155,7 @@ fun app() {
 
             ) {
                 DropdownMenuItem(onClick = {
-                    logger.info {"Option 1 clicked"}
+                    logger.info { "Option 1 clicked" }
                     additionalOptionsGroup1 = true
                     additionalOptionsGroup2 = false
                     additionalOptionsGroup3 = false
@@ -199,9 +199,9 @@ fun app() {
                         Text("Разложить граф случайно по умному", color = colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
-                        logger.info{"Additional Option 2 clicked"}
+                        logger.info { "Additional Option 2 clicked" }
                         colorsForBeetweenes = wgraph.betweennessCentrality()
-                        logger.info { colorsForBeetweenes}
+                        logger.info { colorsForBeetweenes }
 
                         isColorsForBeetweenes = true
                         expanded = false
@@ -210,7 +210,7 @@ fun app() {
                         Text("Ключевые вершины", color = colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
-                        logger.info{"Additional Option 3 clicked"}
+                        logger.info { "Additional Option 3 clicked" }
                         expanded = false
                         //colorsForClusters = Graph.ClusteredGraph.
 //                        //graph.clusterGraph()
@@ -221,7 +221,7 @@ fun app() {
                     }
                 }
                 DropdownMenuItem(onClick = {
-                    logger.info{"Option 2 clicked"}
+                    logger.info { "Option 2 clicked" }
                     additionalOptionsGroup2 = true
                     additionalOptionsGroup1 = false
                     additionalOptionsGroup3 = false
@@ -230,14 +230,14 @@ fun app() {
                 }
                 if (additionalOptionsGroup2) {
                     DropdownMenuItem(onClick = {
-                        logger.info{"Additional Option 1 clicked"}
+                        logger.info { "Additional Option 1 clicked" }
                         expanded = false
                         additionalOptionsGroup2 = false
                     }) {
                         Text("Выделение компонент сильной связности", color = colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
-                        logger.info{"Additional Option 2 clicked"}
+                        logger.info { "Additional Option 2 clicked" }
                         expanded = false
                         additionalOptionsGroup2 = false
                         bridges.value = wgraph.findBridges()
@@ -245,7 +245,7 @@ fun app() {
                         Text("Поиск мостов", color = colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
-                        logger.info{"Additional Option 3 clicked"}
+                        logger.info { "Additional Option 3 clicked" }
                         expanded = false
                         additionalOptionsGroup2 = false
                     }) {
@@ -253,7 +253,7 @@ fun app() {
                     }
                 }
                 DropdownMenuItem(onClick = {
-                    logger.info{"Option 3 clicked"}
+                    logger.info { "Option 3 clicked" }
                     additionalOptionsGroup3 = true
                     additionalOptionsGroup1 = false
                     additionalOptionsGroup2 = false
@@ -262,14 +262,14 @@ fun app() {
                 }
                 if (additionalOptionsGroup3) {
                     DropdownMenuItem(onClick = {
-                        logger.info{"Additional Option 1 clicked"}
+                        logger.info { "Additional Option 1 clicked" }
                         expanded = false
                         additionalOptionsGroup3 = false
                     }) {
                         Text("Построение минимального остовного дерева", color = colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
-                        logger.info{"Additional Option 2 clicked"}
+                        logger.info { "Additional Option 2 clicked" }
                         expanded = false
                         isNodesToFindWayD.value = true
                         additionalOptionsGroup3 = false
@@ -277,7 +277,7 @@ fun app() {
                         Text("Путь между вершинами (Дейкстра)", color = colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
-                        logger.info{"Additional Option 3 clicked"}
+                        logger.info { "Additional Option 3 clicked" }
                         expanded = false
                         isNodesToFindWay.value = true
                         additionalOptionsGroup3 = false
@@ -286,7 +286,7 @@ fun app() {
                     }
                 }
                 DropdownMenuItem(onClick = {
-                    logger.info{"settings"}
+                    logger.info { "settings" }
                     expanded = false
                     openSettings = true
                 }) {
@@ -298,7 +298,7 @@ fun app() {
                         focusable = false,
                         enabled = true,
                         title = "settings",
-                        state = DialogState(position = WindowPosition(windowWidth / 2, windowHeight/ 2)),
+                        state = DialogState(position = WindowPosition(windowWidth / 2, windowHeight / 2)),
                         content = {
                             Box(
                                 modifier = Modifier.padding(1.dp).fillMaxSize().background(colorStates[0]),
@@ -388,7 +388,16 @@ fun app() {
                             linesToDraw.remove(Pair(start, end))
                             wgraph.removeEdge(start as Int, end as Int)
                         }
-                        // Добавьте обработку для других типов действий, если они есть
+                        3 ->{
+                            val (key, pos,lines) = lastAction.data as Triple<Int,Pair<Dp,Dp>,List<Pair<Int,Int>>>
+                            circlesToDraw[key] = pos
+                            wgraph.addNode(key)
+                            for (i in lines){
+                                wgraph.addEdge(i.first,i.second, 1)
+                                linesToDraw[i] = Pair(circlesToDraw[i.first]!!, circlesToDraw[i.second]!!)
+                            }
+
+                        }
                     }
                 }
             }
@@ -399,10 +408,10 @@ fun app() {
             .background(colorStates[0])
 
             .onPreviewKeyEvent { event ->
-                logger.info{event.key}
-                logger.info{event.isCtrlPressed}
+                logger.info { event.key }
+                logger.info { event.isCtrlPressed }
                 if (event.key == Key.Z && event.isCtrlPressed) {
-                    logger.info{actionStack}
+                    logger.info { actionStack }
                     if (actionStack.isNotEmpty()) {
                         val lastAction = actionStack.removeLast()
                         when (lastAction.type) {
@@ -417,7 +426,16 @@ fun app() {
                                 linesToDraw.remove(Pair(start, end))
                                 wgraph.removeEdge(start as Int, end as Int)
                             }
-                            // Добавьте обработку для других типов действий, если они есть
+                            3 ->{
+                                val (key, pos,lines) = lastAction.data as Triple<Int,Pair<Dp,Dp>,List<Pair<Int,Int>>>
+                                circlesToDraw[key] = pos
+                                wgraph.addNode(key)
+                                for (i in lines){
+                                    wgraph.addEdge(i.first,i.second, 1)
+                                    linesToDraw[i] = Pair(circlesToDraw[i.first]!!, circlesToDraw[i.second]!!)
+                                }
+
+                            }
                         }
                     }
                     true
@@ -480,7 +498,7 @@ fun app() {
                                 actionStack.add(Action(1, nodeCounter))
                                 circlesToDraw = circlesToDraw.toMutableMap()
                                     .apply { this[nodeCounter] = Pair(offset.x.toDp(), offset.y.toDp()) }
-                                logger.info{offset}
+                                logger.info { offset }
                                 wgraph.addNode(nodeCounter)
                                 nodeCounter += 1
                             }
@@ -683,11 +701,24 @@ fun app() {
                         ) {
                             Text("Всплывающее окно", color = colorStates[4])
                             Button(onClick = {
-                                //wdgraph.removeNode(key)
-                                //circlesToDraw.remove(key)
-                                //val newLinesToDraw = linesToDraw.filterNot { (k, _) ->
-                                //    k.first == key || k.second == key
-                                //}
+                                wgraph.removeNode(key)
+                                val listToRemove = mutableListOf<Pair<Int,Int>>()
+                                for ( i in linesToDraw.keys){
+                                    if (i.first == key || i.second == key){
+                                        listToRemove.add(i)
+                                    }
+                                }
+                                for (i in listToRemove){
+                                    linesToDraw.remove(i)
+                                }
+                                actionStack.add(Action(
+                                    3,
+                                    Triple(key,circlesToDraw[key] ,listToRemove)
+                                ))
+                                circlesToDraw.remove(key)
+                                selectedCircle = null
+
+
 
                                 //linesToDraw = newLinesToDraw as MutableMap<Pair<Int, Int>, Pair<Pair<Dp, Dp>, Pair<Dp, Dp>>>
                             }) {
@@ -705,7 +736,10 @@ fun app() {
             focusable = true,
             alwaysOnTop = false,
             title = "settings",
-            state = WindowState(position = WindowPosition(windowWidth / 2, windowHeight/ 2), size = DpSize(200.dp, 200.dp)),
+            state = WindowState(
+                position = WindowPosition(windowWidth / 2, windowHeight / 2),
+                size = DpSize(200.dp, 200.dp)
+            ),
             content = {
                 Box(
                     modifier = Modifier.padding(1.dp).fillMaxSize().background(colorStates[0]),
@@ -759,7 +793,12 @@ fun main() = application {
             mainScreen(onStartClick = { showMainScreen = false })
         }
     } else {
-        Window(onCloseRequest = ::exitApplication, state = WindowState(size = windowSize), title = "The best graph visualizator", focusable = true) {
+        Window(
+            onCloseRequest = ::exitApplication,
+            state = WindowState(size = windowSize),
+            title = "The best graph visualizator",
+            focusable = true
+        ) {
             app()
         }
     }
