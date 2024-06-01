@@ -127,6 +127,7 @@ fun app() {
             horizontalArrangement = Arrangement.Start
         ) {
             IconButton(onClick = {
+                openSettings = false
                 isNodesToFindWay.value = false
                 isNodesToFindWayD.value = false
                 expanded = true
@@ -439,6 +440,7 @@ fun app() {
             }
             .pointerInput(Unit) {
                 detectTapGestures(onTap = { offset ->
+                    openSettings = false
                     bridges.value = listOf()
                     isColorsForBeetweenes = false
                     shortestWay.value = listOf()
@@ -667,12 +669,12 @@ fun app() {
 
 // Отображаем всплывающее окно, если круг выбран
             selectedCircle?.let { key ->
-                DialogWindow(onCloseRequest = { selectedCircle = null },
-                    state = DialogState(
+                Window(onCloseRequest = { selectedCircle = null },
+                    state = WindowState(
                         position = WindowPosition(
                             (circlesToDraw[key]!!.first),
                             (circlesToDraw[key]!!.second)
-                        )
+                        ), size = DpSize(250.dp, 250.dp)
                     ),
                     content = {
                         Box(
@@ -699,11 +701,11 @@ fun app() {
     }
     if (openSettings) {
 
-        DialogWindow(onCloseRequest = { openSettings = false },
-            focusable = false,
-            enabled = true,
+        Window(onCloseRequest = { openSettings = false },
+            focusable = true,
+            alwaysOnTop = false,
             title = "settings",
-            state = DialogState(position = WindowPosition(windowWidth / 2, windowHeight/ 2)),
+            state = WindowState(position = WindowPosition(windowWidth / 2, windowHeight/ 2), size = DpSize(200.dp, 200.dp)),
             content = {
                 Box(
                     modifier = Modifier.padding(1.dp).fillMaxSize().background(colorStates[0]),
