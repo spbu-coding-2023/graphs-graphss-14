@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm") version "1.9.22"
+    kotlin("plugin.serialization") version "1.5.31"
     id("org.jetbrains.compose") version "1.6.2"
     id("jacoco")
 }
@@ -15,6 +16,7 @@ repositories {
 
 dependencies {
     testImplementation(kotlin("test"))
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
     implementation(compose.desktop.currentOs)
     implementation("io.github.microutils:kotlin-logging-jvm:2.0.11")
     implementation ("org.slf4j:slf4j-simple:1.7.30")

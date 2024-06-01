@@ -35,6 +35,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import kotlin.math.min
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import java.io.File
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 fun makeLineKeysFromList(nodes: List<Int>): List<Pair<Int, Int>> {
     return nodes.zipWithNext()
@@ -52,6 +57,49 @@ fun findInMap(dict: MutableMap<Int, Pair<Dp, Dp>>, circleRadius: Dp, offset: Off
 }
 
 data class Action(val type: Int, val data: Any?)
+
+
+
+fun Dp.toPixels(density: Density): Float = this.value * density.density
+
+@Serializable
+data class CircleData(
+    val x: Float,
+    val y: Float,
+)
+
+@Serializable
+data class WindowStateData(
+    val circlesToDraw: Map<Int,CircleData>,
+    val linesToDraw: Map<Pair<Int, Int>, Pair<CircleData, CircleData>>,
+    val switchState: Boolean,
+    val nodeCounter: Int
+)
+
+
+fun saveToFile(
+    circlesToDraw: Map<Int, CircleData>,
+    linesToDraw: Map<Pair<Int, Int>, Pair<CircleData, CircleData>>,
+    switchState: Boolean,
+    nodeCounter: Int
+) {
+    val data = WindowStateData( circlesToDraw, linesToDraw, switchState, nodeCounter)
+    val json = Json{
+        allowStructuredMapKeys = true
+    }.encodeToString(data)
+    val directory = File("src/main/resources/save/")
+    directory.mkdirs()
+
+    // Получаем текущее время
+    val currentTime = LocalDateTime.now()
+    // Форматируем время в строку
+    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
+    val formattedTime = currentTime.format(formatter)
+
+    val fileName = "$formattedTime.json"
+    val file = File(directory, fileName)
+    file.writeText(json)
+}
 
 private val logger = KotlinLogging.logger {}
 
@@ -292,35 +340,7 @@ fun app() {
                 }) {
                     Text("settings", color = colorStates[4])
                 }
-                if (openSettings) {
 
-                    DialogWindow(onCloseRequest = { openSettings = false },
-                        focusable = false,
-                        enabled = true,
-                        title = "settings",
-                        state = DialogState(position = WindowPosition(windowWidth / 2, windowHeight / 2)),
-                        content = {
-                            Box(
-                                modifier = Modifier.padding(1.dp).fillMaxSize().background(colorStates[0]),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column {
-                                    Text("This is a popup window", color = colorStates[4])
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("Dark theme:", color = colorStates[4])
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Switch(
-                                            checked = switchState,
-                                            onCheckedChange = { switchState = it }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    )
-
-                }
             }
             RadioButton(
                 selected = selectedOption == 1,
@@ -755,6 +775,31 @@ fun app() {
                                 checked = switchState,
                                 onCheckedChange = { switchState = it }
                             )
+                        }
+                        Button(onClick = {
+                            val circlesToDrawInPixels = circlesToDraw.mapValues { (_, position) ->
+                                CircleData(
+                                    x = position.first.toPixels(density),
+                                    y = position.second.toPixels(density),
+                                )
+                            }
+                            val linesToDrawInPixels = linesToDraw.mapValues { (_, position) ->
+                                Pair(CircleData(
+                                    x = position.first.first.toPixels(density),
+                                    y = position.first.second.toPixels(density)
+                                ), CircleData(
+                                    x = position.second.first.toPixels(density),
+                                    y = position.second.second.toPixels(density)
+                                )
+                                )
+                            }
+                            saveToFile(circlesToDrawInPixels,
+                                linesToDrawInPixels,
+                                switchState,
+                                nodeCounter)
+                            openSettings = false
+                        }){
+                            Text("Save graph")
                         }
                     }
                 }
