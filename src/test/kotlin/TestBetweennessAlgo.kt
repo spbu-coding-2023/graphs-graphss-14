@@ -43,7 +43,6 @@ class GraphTest {
         graph.addEdge(4, 1)
 
         val betweenness = graph.betweennessCentrality()
-        println(betweenness)
         assertEquals(1f/3.0f, betweenness[1])
         assertEquals(1f/3.0f, betweenness[2])
         assertEquals(1f/3.0f, betweenness[3])
