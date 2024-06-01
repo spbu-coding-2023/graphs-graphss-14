@@ -180,7 +180,44 @@ open class Graph {
 
         return betweenness
     }
+    fun findCyclesFromNode(startNode: Int): List<List<Int>> {
+        val cycles = mutableListOf<List<Int>>()
+        val visited = mutableSetOf<Int>()
+        val path = mutableListOf<Int>()
 
+        fun dfs(node: Int) {
+            visited.add(node)
+            path.add(node)
 
+            for (neighbor in adjacencyList[node] ?: emptyList()) {
+                if (!visited.contains(neighbor)) {
+                    dfs(neighbor)
+                } else if (path.contains(neighbor)) {
+                    // Cycle detected
+                    val cycle = path.slice(path.indexOf(neighbor) until path.size)
+                    cycles.add(cycle)
+                }
+            }
 
+            path.removeAt(path.size - 1)
+        }
+
+        dfs(startNode)
+
+        return cycles
+    }
+}
+fun main(){
+    val graph = Graph()
+    graph.addNode(1)
+    graph.addNode(2)
+    graph.addNode(3)
+    graph.addNode(4)
+    graph.addEdge(1, 2)
+    graph.addEdge(2, 3)
+    graph.addEdge(3, 1) // Создаем цикл 1 -> 2 -> 3 -> 1
+    graph.addEdge(3, 4)
+    graph.addEdge(4, 2) // Создаем цикл 2 -> 3 -> 4 -> 2
+
+    println(graph.findCyclesFromNode(1))
 }
