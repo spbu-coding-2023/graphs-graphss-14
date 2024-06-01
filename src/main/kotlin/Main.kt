@@ -1,4 +1,4 @@
-import algos.DGraph
+import mu.KotlinLogging
 import algos.Graph
 import algos.WGraph
 import androidx.compose.foundation.Canvas
@@ -36,11 +36,10 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import kotlin.math.min
 
-data class nodeParameters(val colorNode: Color, val int2: Int)
-
 fun makeLineKeysFromList(nodes: List<Int>): List<Pair<Int, Int>> {
     return nodes.zipWithNext()
 }
+
 //function to find in Map key by the value
 fun findInMap(dict: MutableMap<Int, Pair<Dp, Dp>>, circleRadius: Dp, offset: Offset): Int? {
     for ((key, value) in dict) {
@@ -54,9 +53,12 @@ fun findInMap(dict: MutableMap<Int, Pair<Dp, Dp>>, circleRadius: Dp, offset: Off
 
 data class Action(val type: Int, val data: Any?)
 
+private val logger = KotlinLogging.logger {}
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun app() {
+
     val windowState = rememberWindowState()
     val density = LocalDensity.current
     var windowSize by remember { mutableStateOf(windowState.size) }
@@ -64,18 +66,14 @@ fun app() {
     var windowWidth by remember { mutableStateOf(windowState.size.width) }
     var circlesToDraw by remember { mutableStateOf(mutableMapOf<Int, Pair<Dp, Dp>>()) }
     var colorsForBeetweenes by remember { mutableStateOf(mapOf<Int, Float>()) }
-    var colorsForClusters by remember { mutableStateOf(mapOf<Int, Color>()) }
-    var isColorsForClusters by remember { mutableStateOf(false) }
     var linesToDraw by remember { mutableStateOf(mutableMapOf<Pair<Int, Int>, Pair<Pair<Dp, Dp>, Pair<Dp, Dp>>>()) }
-    val wdgraph = remember{ WGraph() }
+    val wdgraph = remember { WGraph() }
 
-    val dgraph = remember{ DGraph() }
-    val graph = remember{ Graph() }
-    val bridges = remember {  mutableStateOf(listOf<Pair<Int,Int>>())}
+
+    val bridges = remember { mutableStateOf(listOf<Pair<Int, Int>>()) }
     val isNodesToFindWay = remember { mutableStateOf(false) }
     val isNodesToFindWayD = remember { mutableStateOf(false) }
-    val shortestWay = remember {  mutableStateOf(listOf<Int>())}
-    val shortWayKeysLines = remember {  mutableStateOf(listOf<Int>())}
+    val shortestWay = remember { mutableStateOf(listOf<Int>()) }
 
     var selectedCircle by remember { mutableStateOf<Int?>(null) }
     var isDragging by remember { mutableStateOf(false) }
@@ -84,7 +82,6 @@ fun app() {
     var endConnectingPoint by remember { mutableStateOf<Int?>(null) }
     var circleRadius by remember { mutableStateOf(20.dp) }
     var expanded by remember { mutableStateOf(false) }
-    var moveBack by remember { mutableStateOf<Pair<Dp,Dp>?>(null) } // доделать попозже, лень
     var additionalOptionsGroup1 by remember { mutableStateOf(false) }
     var additionalOptionsGroup2 by remember { mutableStateOf(false) }
     var additionalOptionsGroup3 by remember { mutableStateOf(false) }
@@ -92,8 +89,18 @@ fun app() {
     var isColorsForBeetweenes by remember { mutableStateOf(false) }
     var switchState by remember { mutableStateOf(false) }
     var turnBack by remember { mutableStateOf(false) }
-    val colorStates by remember { mutableStateOf(mutableListOf(Color.White, Color.Red, Color.Blue, Color.Gray, Color.Black)) }
-    if (switchState){
+    val colorStates by remember {
+        mutableStateOf(
+            mutableListOf(
+                Color.White,
+                Color.Red,
+                Color.Blue,
+                Color.Gray,
+                Color.Black
+            )
+        )
+    }
+    if (switchState) {
         colorStates[0] = Color.Black
         colorStates[1] = Color.Red
         colorStates[2] = Color.Yellow
@@ -140,153 +147,163 @@ fun app() {
             DropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
-                modifier = Modifier.background(colorStates[0]).padding(1.dp).waterfallPadding().shadow(elevation = 4.dp,
+                modifier = Modifier.background(colorStates[0]).padding(1.dp).waterfallPadding().shadow(
+                    elevation = 4.dp,
                     spotColor = colorStates[4],
-                    ambientColor = colorStates[0])
+                    ambientColor = colorStates[0]
+                )
 
             ) {
                 DropdownMenuItem(onClick = {
-                    println("Option 1 clicked")
+                    logger.info {"Option 1 clicked"}
                     additionalOptionsGroup1 = true
                     additionalOptionsGroup2 = false
                     additionalOptionsGroup3 = false
                 }) {
-                    Text("Основная группа", color=colorStates[4])
+                    Text("Основная группа", color = colorStates[4])
                 }
                 if (additionalOptionsGroup1) {
                     DropdownMenuItem(onClick = {
                         //tyt raskladka norm doljna bit пока что тут рандом
-                        circlesToDraw.forEach{ (key, _) ->
-                            circlesToDraw[key] = Pair(Dp(Random.nextFloat() * windowWidth.value.toInt()),
-                                Dp(Random.nextInt(0, windowHeight.value.toInt()).toFloat()))
+                        circlesToDraw.forEach { (key, _) ->
+                            circlesToDraw[key] = Pair(
+                                Dp(Random.nextFloat() * windowWidth.value.toInt()),
+                                Dp(Random.nextInt(0, windowHeight.value.toInt()).toFloat())
+                            )
                         }
-                        linesToDraw.forEach{ (key, _) ->
+                        linesToDraw.forEach { (key, _) ->
                             linesToDraw[key] = Pair(circlesToDraw[key.first]!!, circlesToDraw[key.second]!!)
                         }
                         //tyt raskladka norm doljna bit
                         expanded = false
                         additionalOptionsGroup1 = false
                     }) {
-                        Text("Разложить граф случайно", color=colorStates[4])
+                        Text("Разложить граф случайно", color = colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
                         val qwerty = Graph.SpringEmbedder().layout(wdgraph)
                         //tyt raskladka norm doljna bit
-                        circlesToDraw.forEach{ (key, _) ->
-                            circlesToDraw[key] = Pair(Dp(qwerty[key]!!.first.toFloat() * windowWidth.value / 20 + windowWidth.value / 2),
-                                Dp(qwerty[key]!!.second.toFloat() * windowHeight.value / 20 + windowHeight.value/2))
+                        circlesToDraw.forEach { (key, _) ->
+                            circlesToDraw[key] = Pair(
+                                Dp(qwerty[key]!!.first.toFloat() * windowWidth.value / 20 + windowWidth.value / 2),
+                                Dp(qwerty[key]!!.second.toFloat() * windowHeight.value / 20 + windowHeight.value / 2)
+                            )
                         }
-                        linesToDraw.forEach{ (key, _) ->
+                        linesToDraw.forEach { (key, _) ->
                             linesToDraw[key] = Pair(circlesToDraw[key.first]!!, circlesToDraw[key.second]!!)
                         }
                         //tyt raskladka norm doljna bit
                         expanded = false
                         additionalOptionsGroup1 = false
                     }) {
-                        Text("Разложить граф случайно по умному", color=colorStates[4])
+                        Text("Разложить граф случайно по умному", color = colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
-                        println("Additional Option 2 clicked")
+                        logger.info{"Additional Option 2 clicked"}
                         colorsForBeetweenes = wdgraph.betweennessCentrality()
-                        println(colorsForBeetweenes)
+                        logger.info { colorsForBeetweenes}
+
                         isColorsForBeetweenes = true
                         expanded = false
                         additionalOptionsGroup1 = false
                     }) {
-                        Text("Ключевые вершины", color=colorStates[4])
+                        Text("Ключевые вершины", color = colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
-                        println("Additional Option 3 clicked")
+                        logger.info{"Additional Option 3 clicked"}
                         expanded = false
                         //colorsForClusters = Graph.ClusteredGraph.
 //                        //graph.clusterGraph()
 //                        //graph.colorClusters()
                         //additionalOptionsGroup1 = false
                     }) {
-                        Text("Выделение сообществ", color=colorStates[4])
+                        Text("Выделение сообществ", color = colorStates[4])
                     }
                 }
                 DropdownMenuItem(onClick = {
-                    println("Option 2 clicked")
+                    logger.info{"Option 2 clicked"}
                     additionalOptionsGroup2 = true
                     additionalOptionsGroup1 = false
                     additionalOptionsGroup3 = false
                 }) {
-                    Text("Option 2", color=colorStates[4])
+                    Text("Option 2", color = colorStates[4])
                 }
                 if (additionalOptionsGroup2) {
                     DropdownMenuItem(onClick = {
-                        println("Additional Option 1 clicked")
+                        logger.info{"Additional Option 1 clicked"}
                         expanded = false
                         additionalOptionsGroup2 = false
                     }) {
-                        Text("Additional Option 1", color=colorStates[4])
+                        Text("Additional Option 1", color = colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
-                        println("Additional Option 2 clicked")
+                        logger.info{"Additional Option 2 clicked"}
                         expanded = false
                         additionalOptionsGroup2 = false
                         bridges.value = wdgraph.findBridges()
                     }) {
-                        Text("Поиск мостов", color=colorStates[4])
+                        Text("Поиск мостов", color = colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
-                        println("Additional Option 3 clicked")
+                        logger.info{"Additional Option 3 clicked"}
                         expanded = false
                         additionalOptionsGroup2 = false
                     }) {
-                        Text("Additional Option 3", color=colorStates[4])
+                        Text("Additional Option 3", color = colorStates[4])
                     }
                 }
                 DropdownMenuItem(onClick = {
-                    println("Option 3 clicked")
+                    logger.info{"Option 3 clicked"}
                     additionalOptionsGroup3 = true
                     additionalOptionsGroup1 = false
                     additionalOptionsGroup2 = false
                 }) {
-                    Text("Option 3", color=colorStates[4])
+                    Text("Option 3", color = colorStates[4])
                 }
                 if (additionalOptionsGroup3) {
                     DropdownMenuItem(onClick = {
-                        println("Additional Option 1 clicked")
+                        logger.info{"Additional Option 1 clicked"}
                         expanded = false
                         additionalOptionsGroup3 = false
                     }) {
-                        Text("Additional Option 1", color=colorStates[4])
+                        Text("Additional Option 1", color = colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
-                        println("Additional Option 2 clicked")
+                        logger.info{"Additional Option 2 clicked"}
                         expanded = false
                         isNodesToFindWayD.value = true
                         additionalOptionsGroup3 = false
                     }) {
-                        Text("Путь между вершинами (Дейкстра)", color=colorStates[4])
+                        Text("Путь между вершинами (Дейкстра)", color = colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
-                        println("Additional Option 3 clicked")
+                        logger.info{"Additional Option 3 clicked"}
                         expanded = false
                         isNodesToFindWay.value = true
                         additionalOptionsGroup3 = false
                     }) {
-                        Text("Путь между вершинами (Форд-Беллман)", color=colorStates[4])
+                        Text("Путь между вершинами (Форд-Беллман)", color = colorStates[4])
                     }
                 }
                 DropdownMenuItem(onClick = {
-                    println("settings")
+                    logger.info{"settings"}
                     openSettings = true
                 }) {
-                    Text("settings", color=colorStates[4])
+                    Text("settings", color = colorStates[4])
                 }
-                if (openSettings){
+                if (openSettings) {
                     DialogWindow(onCloseRequest = { openSettings = false },
                         state = DialogState(position = WindowPosition(200.dp, 200.dp)),
                         content = {
-                            Box(modifier = Modifier.padding(1.dp).fillMaxSize().background(colorStates[0]), contentAlignment = Alignment.Center) {
+                            Box(
+                                modifier = Modifier.padding(1.dp).fillMaxSize().background(colorStates[0]),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Column {
-                                    Text("This is a popup window", color=colorStates[4])
+                                    Text("This is a popup window", color = colorStates[4])
                                     Spacer(modifier = Modifier.height(16.dp))
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("Dark theme:", color=colorStates[4])
+                                        Text("Dark theme:", color = colorStates[4])
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Switch(
                                             checked = switchState,
@@ -307,7 +324,7 @@ fun app() {
                     selectedColor = Color.Cyan // Цвет активного радиобаттона
                 )
             )
-            Text("Создать узлы", modifier = Modifier.align(Alignment.CenterVertically), color=colorStates[4])
+            Text("Создать узлы", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4])
 
             RadioButton(
                 selected = selectedOption == 2,
@@ -318,7 +335,7 @@ fun app() {
                 )
 
             )
-            Text("Соединить узлы", modifier = Modifier.align(Alignment.CenterVertically), color=colorStates[4])
+            Text("Соединить узлы", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4])
 
 //            RadioButton(
 //                selected = selectedOption == 3,
@@ -338,7 +355,7 @@ fun app() {
                     selectedColor = Color.Cyan // Цвет активного радиобаттона
                 )
             )
-            Text("Редактировать", modifier = Modifier.align(Alignment.CenterVertically), color=colorStates[4])
+            Text("Редактировать", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4])
 
             IconButton(onClick = {
                 turnBack = true
@@ -349,7 +366,7 @@ fun app() {
                     modifier = Modifier.size(32.dp) // Размер изображения
                 )
             }
-            if (turnBack){
+            if (turnBack) {
                 turnBack = false
                 if (actionStack.isNotEmpty()) {
                     val lastAction = actionStack.removeLast()
@@ -359,6 +376,7 @@ fun app() {
                             nodeCounter--
                             wdgraph.removeNode(lastAction.data)
                         }
+
                         2 -> {
                             val (start, end) = lastAction.data as Pair<*, *>
                             linesToDraw.remove(Pair(start, end))
@@ -374,11 +392,11 @@ fun app() {
 
             .background(colorStates[0])
 
-            .onPreviewKeyEvent{ event ->
-                println(event.key)
-                println(event.isCtrlPressed)
+            .onPreviewKeyEvent { event ->
+                logger.info{event.key}
+                logger.info{event.isCtrlPressed}
                 if (event.key == Key.Z && event.isCtrlPressed) {
-                    println(actionStack)
+                    logger.info{actionStack}
                     if (actionStack.isNotEmpty()) {
                         val lastAction = actionStack.removeLast()
                         when (lastAction.type) {
@@ -387,6 +405,7 @@ fun app() {
                                 nodeCounter--
                                 wdgraph.removeNode(lastAction.data)
                             }
+
                             2 -> {
                                 val (start, end) = lastAction.data as Pair<*, *>
                                 linesToDraw.remove(Pair(start, end))
@@ -400,16 +419,15 @@ fun app() {
                     false
                 }
             }
-            .onPointerEvent(PointerEventType.Scroll){
-                if (it.changes.first().scrollDelta.y > 0){
-                    circleRadius = (circleRadius.value -  0.3F).toDp()
-                    if (circleRadius.value < 4){
+            .onPointerEvent(PointerEventType.Scroll) {
+                if (it.changes.first().scrollDelta.y > 0) {
+                    circleRadius = (circleRadius.value - 0.3F).toDp()
+                    if (circleRadius.value < 4) {
                         circleRadius = 4.dp
                     }
-                }
-                else{
-                    circleRadius = (circleRadius.value +  0.3F).toDp()
-                    if (circleRadius.value > 25){
+                } else {
+                    circleRadius = (circleRadius.value + 0.3F).toDp()
+                    if (circleRadius.value > 25) {
                         circleRadius = 25.dp
                     }
                 }
@@ -419,28 +437,25 @@ fun app() {
                     bridges.value = listOf()
                     isColorsForBeetweenes = false
                     shortestWay.value = listOf()
-                    if(isNodesToFindWay.value || isNodesToFindWayD.value){
+                    if (isNodesToFindWay.value || isNodesToFindWayD.value) {
                         val hitCircle = findInMap(circlesToDraw, circleRadius, offset)
                         if (hitCircle != null) {
                             if (startConnectingPoint == null) {
                                 startConnectingPoint = hitCircle
                             } else if (endConnectingPoint == null && startConnectingPoint != hitCircle) {
                                 endConnectingPoint = hitCircle
-                                val temp : List<Int>?
-                                if (isNodesToFindWayD.value){
-                                    temp = wdgraph.shortestPathD(startConnectingPoint!!, endConnectingPoint!!)
+                                val temp: List<Int>? = if (isNodesToFindWayD.value) {
+                                    wdgraph.shortestPathD(startConnectingPoint!!, endConnectingPoint!!)
+                                } else {
+                                    wdgraph.shortestPathBF(startConnectingPoint!!, endConnectingPoint!!)
                                 }
-                                else{
-                                    temp = wdgraph.shortestPathBF(startConnectingPoint!!, endConnectingPoint!!)
-                                }
-                                if (temp != null){
+                                if (temp != null) {
                                     shortestWay.value = temp
                                     startConnectingPoint = null
                                     endConnectingPoint = null
                                     isNodesToFindWay.value = false
                                     isNodesToFindWayD.value = false
-                                }
-                                else{
+                                } else {
                                     startConnectingPoint = null
                                     endConnectingPoint = null
                                 }
@@ -448,18 +463,17 @@ fun app() {
                                 startConnectingPoint = null
                                 endConnectingPoint = null
                             }
-                        }
-                        else{
+                        } else {
                             isNodesToFindWay.value = false
                             isNodesToFindWayD.value = false
                         }
-                    }
-                    else{
+                    } else {
                         when (selectedOption) {
                             1 -> {
                                 actionStack.add(Action(1, nodeCounter))
-                                circlesToDraw = circlesToDraw.toMutableMap().apply { this[nodeCounter] = Pair(offset.x.toDp(), offset.y.toDp()) }
-                                println(offset)
+                                circlesToDraw = circlesToDraw.toMutableMap()
+                                    .apply { this[nodeCounter] = Pair(offset.x.toDp(), offset.y.toDp()) }
+                                logger.info{offset}
                                 wdgraph.addNode(nodeCounter)
                                 nodeCounter += 1
                             }
@@ -476,10 +490,18 @@ fun app() {
                                                 endConnectingPoint
                                             ) in linesToDraw)
                                         ) {
-                                            actionStack.add(Action(2, Pair(startConnectingPoint!!, endConnectingPoint!!)))
+                                            actionStack.add(
+                                                Action(
+                                                    2,
+                                                    Pair(startConnectingPoint!!, endConnectingPoint!!)
+                                                )
+                                            )
                                             linesToDraw = linesToDraw.toMutableMap().apply {
                                                 this[Pair(startConnectingPoint!!, endConnectingPoint!!)] =
-                                                    Pair(circlesToDraw[startConnectingPoint]!!, circlesToDraw[endConnectingPoint]!!)
+                                                    Pair(
+                                                        circlesToDraw[startConnectingPoint]!!,
+                                                        circlesToDraw[endConnectingPoint]!!
+                                                    )
                                             }
                                             wdgraph.addEdge(startConnectingPoint!!, endConnectingPoint!!, 1)
                                         }
@@ -538,8 +560,14 @@ fun app() {
                             } as MutableMap<Int, Pair<Dp, Dp>>
                             linesToDraw = linesToDraw.mapValues { (_, value) ->
                                 Pair(
-                                    Pair(value.first.first + dragAmount.x.toDp(), value.first.second + dragAmount.y.toDp()),
-                                    Pair(value.second.first + dragAmount.x.toDp(), value.second.second + dragAmount.y.toDp())
+                                    Pair(
+                                        value.first.first + dragAmount.x.toDp(),
+                                        value.first.second + dragAmount.y.toDp()
+                                    ),
+                                    Pair(
+                                        value.second.first + dragAmount.x.toDp(),
+                                        value.second.second + dragAmount.y.toDp()
+                                    )
                                 )
                             } as MutableMap<Pair<Int, Int>, Pair<Pair<Dp, Dp>, Pair<Dp, Dp>>>
                         }
@@ -571,23 +599,29 @@ fun app() {
                 }
             })
         {
-            val shortway =makeLineKeysFromList(shortestWay.value)
+            val shortway = makeLineKeysFromList(shortestWay.value)
             Canvas(modifier = Modifier.align(Alignment.TopStart)) {
                 val canvasWidth = size.width
                 val canvasHeight = size.height
                 // Отрисовка линий
                 for ((key, value) in linesToDraw) {
                     var col = colorStates[4]
-                    if (Pair(key.first, key.second) in bridges.value || Pair(key.second, key.first) in bridges.value){
+                    if (Pair(key.first, key.second) in bridges.value || Pair(key.second, key.first) in bridges.value) {
                         col = Color.Magenta
                     }
-                    if (Pair(key.first, key.second) in shortway || Pair(key.second, key.first) in shortway){
+                    if (Pair(key.first, key.second) in shortway || Pair(key.second, key.first) in shortway) {
                         col = Color.Green
                     }
                     drawLine(
                         color = col,
-                        start = Offset(value.first.first.value - canvasWidth / 2, value.first.second.value - canvasHeight / 2),
-                        end = Offset(value.second.first.value - canvasWidth / 2, value.second.second.value - canvasHeight / 2),
+                        start = Offset(
+                            value.first.first.value - canvasWidth / 2,
+                            value.first.second.value - canvasHeight / 2
+                        ),
+                        end = Offset(
+                            value.second.first.value - canvasWidth / 2,
+                            value.second.second.value - canvasHeight / 2
+                        ),
                         strokeWidth = 2f
                     )
                 }
@@ -595,15 +629,13 @@ fun app() {
                 // Отрисовка кругов
                 for ((key, value) in circlesToDraw) {
                     var col = colorStates[1]
-                    if (isColorsForBeetweenes){
-
-                        col = Color( red=min((127F+ 255 * colorsForBeetweenes[key]!! / 2).toInt(),255 ) ,0,0)
-                    }
-
-                    else if (shortestWay.value.isNotEmpty() && (key == shortestWay.value.first() || key == shortestWay.value.last())){
+                    if (isColorsForBeetweenes) {
+                        if (key in colorsForBeetweenes && !colorsForBeetweenes[key]!!.isNaN()) {
+                            col = Color(red = min((127F + 255 * colorsForBeetweenes[key]!! / 2).toInt(), 255), 0, 0)
+                        }
+                    } else if (shortestWay.value.isNotEmpty() && (key == shortestWay.value.first() || key == shortestWay.value.last())) {
                         col = Color.Cyan
-                    }
-                    else if (key in shortestWay.value){
+                    } else if (key in shortestWay.value) {
                         col = Color.Blue
                     }
                     drawCircle(
@@ -631,10 +663,18 @@ fun app() {
 // Отображаем всплывающее окно, если круг выбран
             selectedCircle?.let { key ->
                 DialogWindow(onCloseRequest = { selectedCircle = null },
-                    state = DialogState(position = WindowPosition((circlesToDraw[key]!!.first), (circlesToDraw[key]!!.second))),
+                    state = DialogState(
+                        position = WindowPosition(
+                            (circlesToDraw[key]!!.first),
+                            (circlesToDraw[key]!!.second)
+                        )
+                    ),
                     content = {
-                        Box(modifier = Modifier.padding(1.dp).fillMaxSize().background(colorStates[0]), contentAlignment = Alignment.Center) {
-                            Text("Всплывающее окно", color=colorStates[4])
+                        Box(
+                            modifier = Modifier.padding(1.dp).fillMaxSize().background(colorStates[0]),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("Всплывающее окно", color = colorStates[4])
                             Button(onClick = {
                                 //wdgraph.removeNode(key)
                                 //circlesToDraw.remove(key)
@@ -643,8 +683,8 @@ fun app() {
                                 //}
 
                                 //linesToDraw = newLinesToDraw as MutableMap<Pair<Int, Int>, Pair<Pair<Dp, Dp>, Pair<Dp, Dp>>>
-                            }){
-                                Text("Удалить вершину", color=colorStates[4])
+                            }) {
+                                Text("Удалить вершину", color = colorStates[4])
                             }
                         }
                     }
