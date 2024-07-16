@@ -55,19 +55,21 @@ fun findInMap(dict: MutableMap<Int, Pair<Dp, Dp>>, circleRadius: Dp, offset: Off
     }
     return null
 }
-
+// Класс для отслеживания дейсивий пользователя для отмены (1 значение - код действия, 2 - прилагающиеся данные)
 data class Action(val type: Int, val data: Any?)
 
 
-
+// штука, чтобы не ломалось при различных разрешениях экрана
 fun Dp.toPixels(density: Density): Float = this.value * density.density
 
+// инфа про кружочек
 @Serializable
 data class CircleData(
     val x: Float,
     val y: Float,
 )
 
+//инфа про текущее состояние графа (для сохранения) (можно добавить еще какой-то инфы)
 @Serializable
 data class WindowStateData(
     val circlesToDraw: Map<Int,CircleData>,
@@ -76,7 +78,7 @@ data class WindowStateData(
     val nodeCounter: Int
 )
 
-
+//ну собсна сохранение в формат .txt
 fun saveToFile(
     circlesToDraw: Map<Int, CircleData>,
     linesToDraw: Map<Pair<Int, Int>, Pair<CircleData, CircleData>>,
@@ -100,12 +102,13 @@ fun saveToFile(
     val file = File(directory, fileName)
     file.writeText(json)
 }
-
+//отладочная информация в консоль (вместо отладочных принтов)
 private val logger = KotlinLogging.logger {}
-
+//основной код
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun app() {
+    // Вся инфа которую нужно хранить
     val windowState = rememberWindowState()
     val density = LocalDensity.current
     var windowSize by remember { mutableStateOf(windowState.size) }
@@ -136,7 +139,7 @@ fun app() {
     var isColorsForBeetweenes by remember { mutableStateOf(false) }
     var switchState by remember { mutableStateOf(false) }
     var turnBack by remember { mutableStateOf(false) }
-    val colorStates by remember {
+    val colorStates by remember { // цвет темы
         mutableStateOf(
             mutableListOf(
                 Color.White,
@@ -147,7 +150,7 @@ fun app() {
             )
         )
     }
-    if (switchState) {
+    if (switchState) { // тут в зависимости от переключателя в настройках выбирается тема
         colorStates[0] = Color.Black
         colorStates[1] = Color.Red
         colorStates[2] = Color.Yellow
@@ -166,33 +169,33 @@ fun app() {
     var selectedOption by remember { mutableStateOf(1) }
     var nodeCounter by remember { mutableStateOf(0) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
-    Column {
-        Row(
+    Column { // начало UI
+        Row( // всякие модификаторы для того чтобы было красиво
             modifier = Modifier
                 .fillMaxWidth()
                 .background(colorStates[0])
                 .padding(8.dp),
             horizontalArrangement = Arrangement.Start
-        ) {
-            IconButton(onClick = {
+        ) { //тут уже всякие нажимаемые элементы
+            IconButton(onClick = { // в частности это кнопка настроек
                 openSettings = false
                 isNodesToFindWay.value = false
                 isNodesToFindWayD.value = false
-                expanded = true
+                expanded = true // штука отслеживающая открытие DropDownMenu
                 additionalOptionsGroup1 = false
                 additionalOptionsGroup2 = false
+                additionalOptionsGroup3 = false
                 bridges.value = listOf()
                 shortestWay.value = listOf()
-                additionalOptionsGroup3 = false
             }) {
-                Image(
+                Image( // Кортинка
                     painter = painterResource("img/settings.png"), // Замените на путь к вашему изображению
                     contentDescription = "Settings",
                     modifier = Modifier.size(32.dp) // Размер изображения
                 )
-            }
+            } // конец кнопки настроек
 
-            DropdownMenu(
+            DropdownMenu( // само меню после нажатия кнопки настроек
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
                 modifier = Modifier.background(colorStates[0]).padding(1.dp).waterfallPadding().shadow(
@@ -212,7 +215,7 @@ fun app() {
                 }
                 if (additionalOptionsGroup1) {
                     DropdownMenuItem(onClick = {
-                        //tyt raskladka norm doljna bit пока что тут рандом
+                        // случайная раскладка графа на плоскости
                         circlesToDraw.forEach { (key, _) ->
                             circlesToDraw[key] = Pair(
                                 Dp(Random.nextFloat() * windowWidth.value.toInt()),
@@ -222,7 +225,6 @@ fun app() {
                         linesToDraw.forEach { (key, _) ->
                             linesToDraw[key] = Pair(circlesToDraw[key.first]!!, circlesToDraw[key.second]!!)
                         }
-                        //tyt raskladka norm doljna bit
                         expanded = false
                         additionalOptionsGroup1 = false
                     }) {
@@ -230,7 +232,7 @@ fun app() {
                     }
                     DropdownMenuItem(onClick = {
                         val qwerty = Graph.SpringEmbedder().layout(wgraph)
-                        //tyt raskladka norm doljna bit
+                        //раскладка графа алгоритмом от Руслана
                         circlesToDraw.forEach { (key, _) ->
                             circlesToDraw[key] = Pair(
                                 Dp(qwerty[key]!!.first.toFloat() * windowWidth.value / 20 + windowWidth.value / 2),
@@ -240,10 +242,9 @@ fun app() {
                         linesToDraw.forEach { (key, _) ->
                             linesToDraw[key] = Pair(circlesToDraw[key.first]!!, circlesToDraw[key.second]!!)
                         }
-                        //tyt raskladka norm doljna bit
                         expanded = false
                         additionalOptionsGroup1 = false
-                    }) {
+                    }) {// название поменять, на название алгоритма
                         Text("Разложить граф случайно по умному", color = colorStates[4])
                     }
                     DropdownMenuItem(onClick = {
@@ -257,7 +258,7 @@ fun app() {
                     }) {
                         Text("Ключевые вершины", color = colorStates[4])
                     }
-                    DropdownMenuItem(onClick = {
+                    DropdownMenuItem(onClick = { //выделение сообществ (его нет, сделать)
                         logger.info { "Additional Option 3 clicked" }
                         expanded = false
                         //colorsForClusters = Graph.ClusteredGraph.
@@ -277,14 +278,14 @@ fun app() {
                     Text("Группа алгоритмов 1", color = colorStates[4])
                 }
                 if (additionalOptionsGroup2) {
-                    DropdownMenuItem(onClick = {
+                    DropdownMenuItem(onClick = {// выделение компоненты сильной связности (Сделать!)
                         logger.info { "Additional Option 1 clicked" }
                         expanded = false
                         additionalOptionsGroup2 = false
                     }) {
                         Text("Выделение компонент сильной связности", color = colorStates[4])
                     }
-                    DropdownMenuItem(onClick = {
+                    DropdownMenuItem(onClick = { //  поиск мостов (как работают - смотреть в /algos)
                         logger.info { "Additional Option 2 clicked" }
                         expanded = false
                         additionalOptionsGroup2 = false
@@ -292,7 +293,7 @@ fun app() {
                     }) {
                         Text("Поиск мостов", color = colorStates[4])
                     }
-                    DropdownMenuItem(onClick = {
+                    DropdownMenuItem(onClick = { // поиск циклов (Сделать!)
                         logger.info { "Additional Option 3 clicked" }
                         expanded = false
                         additionalOptionsGroup2 = false
@@ -309,14 +310,14 @@ fun app() {
                     Text("Группа алгоритмов 2", color = colorStates[4])
                 }
                 if (additionalOptionsGroup3) {
-                    DropdownMenuItem(onClick = {
+                    DropdownMenuItem(onClick = { // мин. остовное дерево (сделать!)
                         logger.info { "Additional Option 1 clicked" }
                         expanded = false
                         additionalOptionsGroup3 = false
                     }) {
                         Text("Построение минимального остовного дерева", color = colorStates[4])
                     }
-                    DropdownMenuItem(onClick = {
+                    DropdownMenuItem(onClick = { // Дейкстра (работает вроде)
                         logger.info { "Additional Option 2 clicked" }
                         expanded = false
                         isNodesToFindWayD.value = true
@@ -324,7 +325,7 @@ fun app() {
                     }) {
                         Text("Путь между вершинами (Дейкстра)", color = colorStates[4])
                     }
-                    DropdownMenuItem(onClick = {
+                    DropdownMenuItem(onClick = { // Форд-Беллман (вроде работает)
                         logger.info { "Additional Option 3 clicked" }
                         expanded = false
                         isNodesToFindWay.value = true
@@ -333,7 +334,7 @@ fun app() {
                         Text("Путь между вершинами (Форд-Беллман)", color = colorStates[4])
                     }
                 }
-                DropdownMenuItem(onClick = {
+                DropdownMenuItem(onClick = { // просто открывается маленькое меню настроек (там смена темы и сохранение)
                     logger.info { "settings" }
                     expanded = false
                     openSettings = true
@@ -342,8 +343,8 @@ fun app() {
                 }
 
             }
-            RadioButton(
-                selected = selectedOption == 1,
+            RadioButton( // это переключатели на главном окне (соединение / создание / редактирование узлов и отмена)
+                selected = selectedOption == 1, // это создание
                 onClick = { selectedOption = 1 },
                 colors = RadioButtonDefaults.colors(
                     unselectedColor = colorStates[4], // Цвет неактивного радиобаттона
@@ -353,7 +354,7 @@ fun app() {
             Text("Создать узлы", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4])
 
             RadioButton(
-                selected = selectedOption == 2,
+                selected = selectedOption == 2, // соединение
                 onClick = { selectedOption = 2 },
                 colors = RadioButtonDefaults.colors(
                     unselectedColor = colorStates[4], // Цвет неактивного радиобаттона
@@ -363,17 +364,7 @@ fun app() {
             )
             Text("Соединить узлы", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4])
 
-//            RadioButton(
-//                selected = selectedOption == 3,
-//                onClick = { selectedOption = 3 },
-//                colors = RadioButtonDefaults.colors(
-//                    unselectedColor = colorStates[4], // Цвет неактивного радиобаттона
-//                    selectedColor = Color.Cyan // Цвет активного радиобаттона
-//                )
-//            )
-//            Text("Перемещение", modifier = Modifier.align(Alignment.CenterVertically), color=colorStates[4])
-
-            RadioButton(
+            RadioButton( // это редактирование узлов
                 selected = selectedOption == 4,
                 onClick = { selectedOption = 4 },
                 colors = RadioButtonDefaults.colors(
@@ -383,7 +374,7 @@ fun app() {
             )
             Text("Редактировать", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4])
 
-            IconButton(onClick = {
+            IconButton(onClick = { // Отмена
                 turnBack = true
             }) {
                 Image(
@@ -392,23 +383,24 @@ fun app() {
                     modifier = Modifier.size(32.dp) // Размер изображения
                 )
             }
-            if (turnBack) {
+            if (turnBack) { // здесь откат происходит с помощью хранения действий в стеке
+                // Pro tips: сделай ограничение размера стека, типа самое глубокое чтобы удалялось при размере стека >50?
                 turnBack = false
                 if (actionStack.isNotEmpty()) {
                     val lastAction = actionStack.removeLast()
                     when (lastAction.type) {
-                        1 -> {
+                        1 -> { // в стеке действий код 1 значит создание узла (значит мы удаляем)
                             circlesToDraw.remove(lastAction.data as Int)
                             nodeCounter--
                             wgraph.removeNode(lastAction.data)
                         }
 
-                        2 -> {
+                        2 -> { // отмена линии
                             val (start, end) = lastAction.data as Pair<*, *>
                             linesToDraw.remove(Pair(start, end))
                             wgraph.removeEdge(start as Int, end as Int)
                         }
-                        3 ->{
+                        3 ->{ // отмена передвижения
                             val (key, pos,lines) = lastAction.data as Triple<Int,Pair<Dp,Dp>,List<Pair<Int,Int>>>
                             circlesToDraw[key] = pos
                             wgraph.addNode(key)
@@ -427,14 +419,14 @@ fun app() {
 
             .background(colorStates[0])
 
-            .onPreviewKeyEvent { event ->
+            .onPreviewKeyEvent { event -> // обработка действий пользователя на клавиатуре (не работает)
                 logger.info { event.key }
                 logger.info { event.isCtrlPressed }
                 if (event.key == Key.Z && event.isCtrlPressed) {
                     logger.info { actionStack }
                     if (actionStack.isNotEmpty()) {
                         val lastAction = actionStack.removeLast()
-                        when (lastAction.type) {
+                        when (lastAction.type) { // повторение функций кнопки отмена
                             1 -> {
                                 circlesToDraw.remove(lastAction.data as Int)
                                 nodeCounter--
@@ -463,7 +455,7 @@ fun app() {
                     false
                 }
             }
-            .onPointerEvent(PointerEventType.Scroll) {
+            .onPointerEvent(PointerEventType.Scroll) { // кручение колесика (уменьшает / увеличивает кружочки)
                 if (it.changes.first().scrollDelta.y > 0) {
                     circleRadius = (circleRadius.value - 0.3F).toDp()
                     if (circleRadius.value < 4) {
@@ -476,7 +468,7 @@ fun app() {
                     }
                 }
             }
-            .pointerInput(Unit) {
+            .pointerInput(Unit) { // нажатие на поле (в зависимости от выбранного радиобаттона либо создаст круг, либо подсветит кружок)
                 detectTapGestures(onTap = { offset ->
                     openSettings = false
                     bridges.value = listOf()
@@ -570,7 +562,7 @@ fun app() {
                         }
                     }
                 })
-            }.onSizeChanged { newSize ->
+            }.onSizeChanged { newSize -> // обработка изменения размеров приложения
                 val temp = with(density) { DpSize(newSize.width.toDp(), newSize.height.toDp()) }
                 if (temp != windowSize) {
                     windowSize = temp
@@ -579,7 +571,7 @@ fun app() {
                 }
             }
             .pointerInput(Unit) {
-                detectDragGestures(
+                detectDragGestures( // обработка перемещательных действий пользователя (кружка или всей плоскости)
                     onDragStart = { offset ->
                         selectedCircle = null
                         selectedCircleToMove = findInMap(circlesToDraw, circleRadius, offset)
@@ -645,7 +637,7 @@ fun app() {
             })
         {
             val shortway = makeLineKeysFromList(shortestWay.value)
-            Canvas(modifier = Modifier.align(Alignment.TopStart)) {
+            Canvas(modifier = Modifier.align(Alignment.TopStart)) { // тут начинается отрисовка всего непотребства на экране
                 val canvasWidth = size.width
                 val canvasHeight = size.height
                 // Отрисовка линий
@@ -697,7 +689,7 @@ fun app() {
                             center = Offset(value.first.value - canvasWidth / 2, value.second.value - canvasHeight / 2),
                             style = Stroke(width = 2.dp.toPx())
                         )
-                    }
+                    } // если придумаешь как делать текст на кружочках будешь крутым (я не смог)
                     //drawText(
                     //    textLayoutResult = TextLayoutResult(layoutInput=(),)
                     //)
@@ -719,7 +711,8 @@ fun app() {
                             modifier = Modifier.padding(1.dp).fillMaxSize().background(colorStates[0]),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("Всплывающее окно", color = colorStates[4])
+                            Text("Редактирование узла", color = colorStates[4])
+                            // вот сюда можно добавить еще всякого полезного, типа настройки веса ребра как нибудь, я не придумал)
                             Button(onClick = {
                                 wgraph.removeNode(key)
                                 val listToRemove = mutableListOf<Pair<Int,Int>>()
@@ -750,7 +743,7 @@ fun app() {
             }
         }
     }
-    if (openSettings) {
+    if (openSettings) { // всплывающее окно настроек
 
         Window(onCloseRequest = { openSettings = false },
             focusable = true,
@@ -810,7 +803,7 @@ fun app() {
 }
 
 @Composable
-fun mainScreen(onStartClick: () -> Unit) {
+fun mainScreen(onStartClick: () -> Unit) { // стартовое окно с загрузкой или старта с 0
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -826,7 +819,7 @@ fun mainScreen(onStartClick: () -> Unit) {
     }
 }
 
-fun main() = application {
+fun main() = application { // то что запускается и вызывает все остальное
 
     val density = LocalDensity.current
     val windowSize = with(density) { DpSize(800.dp.value.toInt().toDp(), 600.dp.value.toInt().toDp()) }
@@ -841,7 +834,7 @@ fun main() = application {
         Window(
             onCloseRequest = ::exitApplication,
             state = WindowState(size = windowSize),
-            title = "The best graph visualizator",
+            title = "The best graph visualizer",
             focusable = true
         ) {
             app()
