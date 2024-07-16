@@ -78,7 +78,7 @@ data class WindowStateData(
     val nodeCounter: Int
 )
 
-//ну собсна сохранение в формат .txt
+//ну собсна сохранение в формат .json
 fun saveToFile(
     circlesToDraw: Map<Int, CircleData>,
     linesToDraw: Map<Pair<Int, Int>, Pair<CircleData, CircleData>>,
