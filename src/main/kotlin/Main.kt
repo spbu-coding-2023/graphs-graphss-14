@@ -88,7 +88,8 @@ fun saveToFile(
     val data = WindowStateData( circlesToDraw, linesToDraw, switchState, nodeCounter)
     val json = Json{
         allowStructuredMapKeys = true
-    }.encodeToString(data)
+    }.
+    encodeToString(value = data)
     val directory = File("src/main/resources/save/")
     directory.mkdirs()
 
@@ -150,6 +151,14 @@ fun app() {
             )
         )
     }
+
+    /*
+
+    val firstImage = if (switchState) painterResource(image1) else painterResource(imageBlack)
+
+    Image(painter = firstImage)
+
+    */
     if (switchState) { // тут в зависимости от переключателя в настройках выбирается тема
         colorStates[0] = Color.Black
         colorStates[1] = Color.Red
@@ -189,9 +198,9 @@ fun app() {
                 shortestWay.value = listOf()
             }) {
                 Image( // Кортинка
-                    painter = painterResource("img/settings.png"), // Замените на путь к вашему изображению
-                    contentDescription = "Settings",
-                    modifier = Modifier.size(32.dp) // Размер изображения
+                    painter = painterResource("img/logo(Black).png"), // Замените на путь к вашему изображению
+                    contentDescription = "Параметры",
+                    modifier = Modifier.size(30.dp) // Размер изображения
                 )
             } // конец кнопки настроек
 
@@ -211,9 +220,25 @@ fun app() {
                     additionalOptionsGroup2 = false
                     additionalOptionsGroup3 = false
                 }) {
-                    Text("Основная группа", color = colorStates[4])
+                    Text("Работающие алгоритмы", color = colorStates[4])
                 }
                 if (additionalOptionsGroup1) {
+                    DropdownMenuItem(onClick = {
+                        logger.info { "Addtional Option" }
+                        expanded = false
+                        isNodesToFindWayD.value = true
+                        additionalOptionsGroup1 = false
+                    }){
+                        Text("Дейкстра", color = colorStates[4])
+                    }
+                    DropdownMenuItem(onClick = {
+                        logger.info { "Addtional Option" }
+                        expanded = false
+                        isNodesToFindWay.value = true
+                        additionalOptionsGroup1 = false
+                    }) {
+                        Text("Форд-Беллман", color = colorStates[4])
+                    }
                     DropdownMenuItem(onClick = {
                         // случайная раскладка графа на плоскости
                         circlesToDraw.forEach { (key, _) ->
@@ -258,6 +283,23 @@ fun app() {
                     }) {
                         Text("Ключевые вершины", color = colorStates[4])
                     }
+                }
+                DropdownMenuItem(onClick = {
+                    logger.info { "Option 2 clicked" }
+                    additionalOptionsGroup2 = true
+                    additionalOptionsGroup1 = false
+                    additionalOptionsGroup3 = false
+                }) {
+                    Text("Группа нерабочих", color = colorStates[4])
+                }
+                if (additionalOptionsGroup2) {
+                    DropdownMenuItem(onClick = {// выделение компоненты сильной связности (Сделать!)
+                        logger.info { "Additional Option 1 clicked" }
+                        expanded = false
+                        additionalOptionsGroup2 = false
+                    }) {
+                        Text("Выделение компонент сильной связности", color = colorStates[4])
+                    }
                     DropdownMenuItem(onClick = { //выделение сообществ (его нет, сделать)
                         logger.info { "Additional Option 3 clicked" }
                         expanded = false
@@ -267,23 +309,6 @@ fun app() {
                         //additionalOptionsGroup1 = false
                     }) {
                         Text("Выделение сообществ", color = colorStates[4])
-                    }
-                }
-                DropdownMenuItem(onClick = {
-                    logger.info { "Option 2 clicked" }
-                    additionalOptionsGroup2 = true
-                    additionalOptionsGroup1 = false
-                    additionalOptionsGroup3 = false
-                }) {
-                    Text("Группа алгоритмов 1", color = colorStates[4])
-                }
-                if (additionalOptionsGroup2) {
-                    DropdownMenuItem(onClick = {// выделение компоненты сильной связности (Сделать!)
-                        logger.info { "Additional Option 1 clicked" }
-                        expanded = false
-                        additionalOptionsGroup2 = false
-                    }) {
-                        Text("Выделение компонент сильной связности", color = colorStates[4])
                     }
                     DropdownMenuItem(onClick = { //  поиск мостов (как работают - смотреть в /algos)
                         logger.info { "Additional Option 2 clicked" }
@@ -301,14 +326,6 @@ fun app() {
                         Text("Поиск циклов для заданной вершины", color = colorStates[4])
                     }
                 }
-                DropdownMenuItem(onClick = {
-                    logger.info { "Option 3 clicked" }
-                    additionalOptionsGroup3 = true
-                    additionalOptionsGroup1 = false
-                    additionalOptionsGroup2 = false
-                }) {
-                    Text("Группа алгоритмов 2", color = colorStates[4])
-                }
                 if (additionalOptionsGroup3) {
                     DropdownMenuItem(onClick = { // мин. остовное дерево (сделать!)
                         logger.info { "Additional Option 1 clicked" }
@@ -317,29 +334,45 @@ fun app() {
                     }) {
                         Text("Построение минимального остовного дерева", color = colorStates[4])
                     }
-                    DropdownMenuItem(onClick = { // Дейкстра (работает вроде)
-                        logger.info { "Additional Option 2 clicked" }
-                        expanded = false
-                        isNodesToFindWayD.value = true
-                        additionalOptionsGroup3 = false
-                    }) {
-                        Text("Путь между вершинами (Дейкстра)", color = colorStates[4])
-                    }
-                    DropdownMenuItem(onClick = { // Форд-Беллман (вроде работает)
-                        logger.info { "Additional Option 3 clicked" }
-                        expanded = false
-                        isNodesToFindWay.value = true
-                        additionalOptionsGroup3 = false
-                    }) {
-                        Text("Путь между вершинами (Форд-Беллман)", color = colorStates[4])
-                    }
+//                DropdownMenuItem(onClick = {
+//                    logger.info { "Option 3 clicked" }
+//                    additionalOptionsGroup3 = true
+//                    additionalOptionsGroup1 = false
+//                    additionalOptionsGroup2 = false
+//                }) {
+//                    Text("Группа Придурков", color = colorStates[4])
+//                }
+//                if (additionalOptionsGroup3) {
+//                    DropdownMenuItem(onClick = { // мин. остовное дерево (сделать!)
+//                        logger.info { "Additional Option 1 clicked" }
+//                        expanded = false
+//                        additionalOptionsGroup3 = false
+//                    }) {
+//                        Text("Построение минимального остовного дерева", color = colorStates[4])
+//                    }
+//                    DropdownMenuItem(onClick = { // Дейкстра (работает вроде)
+//                        logger.info { "Additional Option 2 clicked" }
+//                        expanded = false
+//                        isNodesToFindWayD.value = true
+//                        additionalOptionsGroup3 = false
+//                    }) {
+//                        Text("Путь между вершинами (Дейкстра)", color = colorStates[4])
+//                    }
+//                    DropdownMenuItem(onClick = { // Форд-Беллман (вроде работает)
+//                        logger.info { "Additional Option 3 clicked" }
+//                        expanded = false
+//                        isNodesToFindWay.value = true
+//                        additionalOptionsGroup3 = false
+//                    }) {
+//                        Text("Путь между вершинами (Форд-Беллман)", color = colorStates[4])
+//                    }
                 }
                 DropdownMenuItem(onClick = { // просто открывается маленькое меню настроек (там смена темы и сохранение)
                     logger.info { "settings" }
                     expanded = false
                     openSettings = true
                 }) {
-                    Text("settings", color = colorStates[4])
+                    Text("Параметры", color = colorStates[4])
                 }
 
             }
@@ -378,9 +411,9 @@ fun app() {
                 turnBack = true
             }) {
                 Image(
-                    painter = painterResource("img/back.png"), // Замените на путь к вашему изображению
+                    painter = painterResource("img/nazad(Black).png"), // Замените на путь к вашему изображению
                     contentDescription = "Back",
-                    modifier = Modifier.size(32.dp) // Размер изображения
+                    modifier = Modifier.size(30.dp) // Размер изображения
                 )
             }
             if (turnBack) { // здесь откат происходит с помощью хранения действий в стеке
@@ -504,7 +537,10 @@ fun app() {
                             isNodesToFindWay.value = false
                             isNodesToFindWayD.value = false
                         }
-                    } else {
+                    } else {         //colorsForClusters = Graph.ClusteredGraph.
+//                        //graph.clusterGraph()
+//                        //graph.colorClusters()
+                        //additionalOptionsGroup1 = false
                         when (selectedOption) {
                             1 -> {
                                 actionStack.add(Action(1, nodeCounter))
@@ -684,7 +720,7 @@ fun app() {
                     // Проверка, является ли круг выбранным или перемещаемым
                     if (selectedCircle == key || selectedCircleToMove == key || startConnectingPoint == key) {
                         drawCircle(
-                            color = colorStates[2],
+                            color = colorStates[1],
                             radius = circleRadius.value + 1,
                             center = Offset(value.first.value - canvasWidth / 2, value.second.value - canvasHeight / 2),
                             style = Stroke(width = 2.dp.toPx())
@@ -759,10 +795,10 @@ fun app() {
                     contentAlignment = Alignment.Center
                 ) {
                     Column {
-                        Text("This is a settings", color = colorStates[4])
+                        Text("Выбрать тему", color = colorStates[4])
                         Spacer(modifier = Modifier.height(16.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Dark theme:", color = colorStates[4])
+                            Text("Тёмная тема:", color = colorStates[4])
                             Spacer(modifier = Modifier.width(8.dp))
                             Switch(
                                 checked = switchState,
@@ -792,7 +828,7 @@ fun app() {
                                 nodeCounter)
                             openSettings = false
                         }){
-                            Text("Save graph")
+                            Text("Сохранить граф")
                         }
                     }
                 }
@@ -810,10 +846,10 @@ fun mainScreen(onStartClick: () -> Unit) { // стартовое окно с з�
         verticalArrangement = Arrangement.Center
     ) {
         Button(onClick = onStartClick) {
-            Text("Start")
+            Text("Построить граф")
         }
         Button(onClick = { /* Handle other button click */ }) {
-            Text("Load save")
+            Text("Загрузить сохранение")
         }
 
     }
