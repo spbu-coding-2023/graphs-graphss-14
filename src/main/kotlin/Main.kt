@@ -142,6 +142,7 @@ fun app() {
     var isColorsForBeetweenes by remember { mutableStateOf(false) }
     var switchState by remember { mutableStateOf(false) }
     var turnBack by remember { mutableStateOf(false) }
+    var iconStates by remember { mutableStateOf( false) }
     val colorStates by remember { // цвет темы
         mutableStateOf(
             mutableListOf(
@@ -149,7 +150,7 @@ fun app() {
                 Color.Red,
                 Color.Blue,
                 Color.Gray,
-                Color.Black
+                Color.Black,
             )
         )
     }
@@ -167,12 +168,14 @@ fun app() {
         colorStates[2] = Color.Yellow
         colorStates[3] = Color.LightGray
         colorStates[4] = Color.White
+        iconStates = false
     } else {
         colorStates[0] = Color.White
         colorStates[1] = Color.Red
         colorStates[2] = Color.Blue
         colorStates[3] = Color.Gray
         colorStates[4] = Color.Black
+        iconStates = true
     }
 
     val actionStack = remember { mutableStateListOf<Action>() }
@@ -198,9 +201,15 @@ fun app() {
                 additionalOptionsGroup3 = false
                 bridges.value = listOf()
                 shortestWay.value = listOf()
+
             }) {
+                val imageResource = if (iconStates) {
+                    painterResource("img/logo(Black).png")
+                } else {
+                    painterResource("img/logo(white).png")
+                }
                 Image( // Кортинка
-                    painter = painterResource("img/logo(Black).png"), // Замените на путь к вашему изображению
+                    painter = imageResource,
                     contentDescription = "Параметры",
                     modifier = Modifier.size(30.dp) // Размер изображения
                 )
@@ -382,8 +391,14 @@ fun app() {
             IconButton(onClick = { // Отмена
                 turnBack = true
             }) {
+
+                val imageResource = if (iconStates) {
+                    painterResource("img/nazad(Black).png")
+                } else
+                    painterResource("img/nazad(White).png")
+
                 Image(
-                    painter = painterResource("img/nazad(Black).png"), // Замените на путь к вашему изображению
+                    painter = imageResource, // Замените на путь к вашему изображению
                     contentDescription = "Back",
                     modifier = Modifier.size(30.dp) // Размер изображения
                 )
