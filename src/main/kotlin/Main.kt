@@ -125,6 +125,8 @@ fun app() {
     val isNodesToFindWay = remember { mutableStateOf(false) }
     val isNodesToFindWayD = remember { mutableStateOf(false) }
     val shortestWay = remember { mutableStateOf(listOf<Int>()) }
+    val cyclesFromNode  = remember { mutableStateOf(listOf<List<Int>>()) }
+    var isCyclesFromNode  by remember { mutableStateOf(false) }
 
     var selectedCircle by remember { mutableStateOf<Int?>(null) }
     var isDragging by remember { mutableStateOf(false) }
@@ -322,6 +324,8 @@ fun app() {
                         logger.info { "Additional Option 3 clicked" }
                         expanded = false
                         additionalOptionsGroup2 = false
+                        isCyclesFromNode = true
+
                     }) {
                         Text("Поиск циклов для заданной вершины", color = colorStates[4])
                     }
@@ -334,38 +338,6 @@ fun app() {
                     }) {
                         Text("Построение минимального остовного дерева", color = colorStates[4])
                     }
-//                DropdownMenuItem(onClick = {
-//                    logger.info { "Option 3 clicked" }
-//                    additionalOptionsGroup3 = true
-//                    additionalOptionsGroup1 = false
-//                    additionalOptionsGroup2 = false
-//                }) {
-//                    Text("Группа Придурков", color = colorStates[4])
-//                }
-//                if (additionalOptionsGroup3) {
-//                    DropdownMenuItem(onClick = { // мин. остовное дерево (сделать!)
-//                        logger.info { "Additional Option 1 clicked" }
-//                        expanded = false
-//                        additionalOptionsGroup3 = false
-//                    }) {
-//                        Text("Построение минимального остовного дерева", color = colorStates[4])
-//                    }
-//                    DropdownMenuItem(onClick = { // Дейкстра (работает вроде)
-//                        logger.info { "Additional Option 2 clicked" }
-//                        expanded = false
-//                        isNodesToFindWayD.value = true
-//                        additionalOptionsGroup3 = false
-//                    }) {
-//                        Text("Путь между вершинами (Дейкстра)", color = colorStates[4])
-//                    }
-//                    DropdownMenuItem(onClick = { // Форд-Беллман (вроде работает)
-//                        logger.info { "Additional Option 3 clicked" }
-//                        expanded = false
-//                        isNodesToFindWay.value = true
-//                        additionalOptionsGroup3 = false
-//                    }) {
-//                        Text("Путь между вершинами (Форд-Беллман)", color = colorStates[4])
-//                    }
                 }
                 DropdownMenuItem(onClick = { // просто открывается маленькое меню настроек (там смена темы и сохранение)
                     logger.info { "settings" }
@@ -506,9 +478,16 @@ fun app() {
                     openSettings = false
                     bridges.value = listOf()
                     isColorsForBeetweenes = false
+                    cyclesFromNode.value = listOf()
                     shortestWay.value = listOf()
+                    val hitCircle = findInMap(circlesToDraw, circleRadius, offset)
+                    if (hitCircle != null && isCyclesFromNode){
+                        cyclesFromNode.value = wgraph.findCyclesFromNode(hitCircle)
+                        logger.info {cyclesFromNode}
+                    }
+                    else
+                        isCyclesFromNode = false
                     if (isNodesToFindWay.value || isNodesToFindWayD.value) {
-                        val hitCircle = findInMap(circlesToDraw, circleRadius, offset)
                         if (hitCircle != null) {
                             if (startConnectingPoint == null) {
                                 startConnectingPoint = hitCircle
@@ -537,10 +516,7 @@ fun app() {
                             isNodesToFindWay.value = false
                             isNodesToFindWayD.value = false
                         }
-                    } else {         //colorsForClusters = Graph.ClusteredGraph.
-//                        //graph.clusterGraph()
-//                        //graph.colorClusters()
-                        //additionalOptionsGroup1 = false
+                    } else {
                         when (selectedOption) {
                             1 -> {
                                 actionStack.add(Action(1, nodeCounter))
@@ -673,12 +649,17 @@ fun app() {
             })
         {
             val shortway = makeLineKeysFromList(shortestWay.value)
+
             Canvas(modifier = Modifier.align(Alignment.TopStart)) { // тут начинается отрисовка всего непотребства на экране
                 val canvasWidth = size.width
                 val canvasHeight = size.height
                 // Отрисовка линий
                 for ((key, value) in linesToDraw) {
                     var col = colorStates[4]
+                    if (cyclesFromNode.value.isNotEmpty() && (listOf(key.first, key.second) in cyclesFromNode.value ||
+                        (key.second == cyclesFromNode.value.last()[0] && key.first == cyclesFromNode.value.last().last()))){
+                        col = Color.Magenta
+                    }
                     if (Pair(key.first, key.second) in bridges.value || Pair(key.second, key.first) in bridges.value) {
                         col = Color.Magenta
                     }
@@ -702,6 +683,14 @@ fun app() {
                 // Отрисовка кругов
                 for ((key, value) in circlesToDraw) {
                     var col = colorStates[1]
+                    if (isCyclesFromNode && cyclesFromNode.value.isNotEmpty()){
+                        if (key in cyclesFromNode.value.last()){
+                            logger.info {"good"}
+                            col = Color.Blue
+                        }
+                        if (key == cyclesFromNode.value.last()[0])
+                            col = Color.Cyan
+                    }
                     if (isColorsForBeetweenes) {
                         if (key in colorsForBeetweenes && !colorsForBeetweenes[key]!!.isNaN()) {
                             col = Color(red = min((127F + 255 * colorsForBeetweenes[key]!! / 2).toInt(), 255), 0, 0)
@@ -720,7 +709,7 @@ fun app() {
                     // Проверка, является ли круг выбранным или перемещаемым
                     if (selectedCircle == key || selectedCircleToMove == key || startConnectingPoint == key) {
                         drawCircle(
-                            color = colorStates[1],
+                            color = colorStates[2],
                             radius = circleRadius.value + 1,
                             center = Offset(value.first.value - canvasWidth / 2, value.second.value - canvasHeight / 2),
                             style = Stroke(width = 2.dp.toPx())
