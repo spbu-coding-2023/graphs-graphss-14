@@ -127,6 +127,7 @@ fun app() {
     val shortestWay = remember { mutableStateOf(listOf<Int>()) }
     val cyclesFromNode  = remember { mutableStateOf(listOf<List<Int>>()) }
     var isCyclesFromNode  by remember { mutableStateOf(false) }
+    var nodesInClusters by remember { mutableStateOf(mapOf<Int, Float>()) }
 
     var selectedCircle by remember { mutableStateOf<Int?>(null) }
     var isDragging by remember { mutableStateOf(false) }
@@ -314,6 +315,8 @@ fun app() {
                     DropdownMenuItem(onClick = { //выделение сообществ (его нет, сделать)
                         logger.info { "Additional Option 3 clicked" }
                         expanded = false
+                        nodesInClusters = wgraph.betweennessCentrality()
+                        logger.info { nodesInClusters }
                         //colorsForClusters = Graph.ClusteredGraph.
 //                        //graph.clusterGraph()
 //                        //graph.colorClusters()
@@ -669,10 +672,17 @@ fun app() {
                 val canvasWidth = size.width
                 val canvasHeight = size.height
                 // Отрисовка линий
+                val allPairs = cyclesFromNode.value.flatMap { cycle ->
+                    val pairs = cycle.zipWithNext().map { (a, b) -> Pair(a, b) }
+                    if (cycle.size > 1) {
+                        pairs + Pair(cycle.last(), cycle.first())
+                    } else {
+                        pairs
+                    }
+                }
                 for ((key, value) in linesToDraw) {
                     var col = colorStates[4]
-                    if (cyclesFromNode.value.isNotEmpty() && (listOf(key.first, key.second) in cyclesFromNode.value ||
-                        (key.second == cyclesFromNode.value.last()[0] && key.first == cyclesFromNode.value.last().last()))){
+                    if (key in allPairs || Pair(key.second, key.first) in allPairs){
                         col = Color.Magenta
                     }
                     if (Pair(key.first, key.second) in bridges.value || Pair(key.second, key.first) in bridges.value) {
@@ -696,14 +706,14 @@ fun app() {
                 }
 
                 // Отрисовка кругов
+                val uniqueVertices = cyclesFromNode.value.flatten().toSet()
                 for ((key, value) in circlesToDraw) {
                     var col = colorStates[1]
                     if (isCyclesFromNode && cyclesFromNode.value.isNotEmpty()){
-                        if (key in cyclesFromNode.value.last()){
-                            logger.info {"good"}
+                        if (key in uniqueVertices){
                             col = Color.Blue
                         }
-                        if (key == cyclesFromNode.value.last()[0])
+                        if (key == cyclesFromNode.value.first()[0])
                             col = Color.Cyan
                     }
                     if (isColorsForBeetweenes) {
@@ -736,6 +746,7 @@ fun app() {
                 }
 
             }
+            cyclesFromNode.value = listOf()
 
 // Отображаем всплывающее окно, если круг выбран
             selectedCircle?.let { key ->
