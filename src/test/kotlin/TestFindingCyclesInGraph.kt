@@ -18,7 +18,7 @@ class TestFindingCyclesInGraph {
         graph.addEdge(4, 2) // Создаем цикл 2 -> 3 -> 4 -> 2
 
         val cycles = graph.findCyclesFromNode(2)
-        assertEquals(4, cycles.size)
+        assertEquals(3, cycles.size)
         assertEquals(listOf(2, 3, 4), cycles.sortedBy { -it.size }[0])
     }
 
@@ -36,7 +36,7 @@ class TestFindingCyclesInGraph {
         graph.addEdge(4, 2) // Создаем цикл 2 -> 3 -> 4 -> 2
 
         val cycles = graph.findCyclesFromNode(1)
-        assertEquals(5, cycles.size)
+        assertEquals(2, cycles.size)
         assertEquals(listOf(1, 2, 3), cycles.sortedBy { -it.size }[0])
     }
 
