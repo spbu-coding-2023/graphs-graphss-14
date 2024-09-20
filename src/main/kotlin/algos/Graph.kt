@@ -69,10 +69,6 @@ open class Graph {
 
         return bridges
     }
-    fun printAll(){
-        println(nodes)
-        println(edges)
-    }
 
     open class SpringEmbedder {
         private val smoothingFactor = 0.1
@@ -208,20 +204,4 @@ open class Graph {
 
         return cycles
     }
-}
-fun main(){
-    val graph = Graph()
-    graph.addNode(1)
-    graph.addNode(2)
-    graph.addNode(3)
-    graph.addNode(4)
-    graph.addEdge(1, 2)
-    graph.addEdge(2, 3)
-    graph.addEdge(3, 1) // Создаем цикл 1 -> 2 -> 3 -> 1
-    graph.addEdge(3, 4)
-    graph.addEdge(2, 4)
-    graph.addEdge(4, 1)
-    graph.addEdge(4, 2) // Создаем цикл 2 -> 3 -> 4 -> 2
-
-    println(graph.findCyclesFromNode(1))
 }

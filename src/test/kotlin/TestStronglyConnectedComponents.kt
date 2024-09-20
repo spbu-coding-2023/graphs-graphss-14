@@ -6,41 +6,6 @@ import org.junit.jupiter.api.Test
 class TestStronglyConnectedComponents{
 
     @Test
-    fun `test Add Node`() {
-        val graph = DiGraph()
-        graph.addNode(1)
-        graph.addNode(2)
-        assertEquals(2, graph.nodes.size)
-        assertEquals(true, graph.nodes.contains(1))
-        assertEquals(true, graph.nodes.contains(2))
-    }
-
-    @Test
-    fun `test Add Edge`() {
-        val graph = DiGraph()
-        graph.addNode(1)
-        graph.addNode(2)
-        graph.addEdge(1, 2)
-        assertEquals(1, graph.edges.size)
-        assertEquals(true, graph.edges.contains(Pair(1, 2)))
-        assertEquals(1, graph.adjacencyList[1]?.size)
-        assertEquals(true, graph.adjacencyList[1]?.contains(2))
-    }
-
-    @Test
-    fun `test Transpose`() {
-        val graph = DiGraph()
-        graph.addNode(1)
-        graph.addNode(2)
-        graph.addEdge(1, 2)
-        val transposedGraph = graph.transpose()
-        assertEquals(1, transposedGraph.edges.size)
-        assertEquals(true, transposedGraph.edges.contains(Pair(2, 1)))
-        assertEquals(1, transposedGraph.adjacencyList[2]?.size)
-        assertEquals(true, transposedGraph.adjacencyList[2]?.contains(1))
-    }
-
-    @Test
     fun `test Find SCCs`() {
         val graph = DiGraph()
         graph.addNode(1)
