@@ -17,7 +17,7 @@ class TestFindingCyclesInGraph {
         graph.addEdge(3, 4)
         graph.addEdge(4, 2) // Создаем цикл 2 -> 3 -> 4 -> 2
 
-        val cycles = graph.findCyclesFromNode(2)
+        val cycles = graph.findCyclesFromNode(2, true)
         assertEquals(3, cycles.size)
         assertEquals(listOf(2, 3, 4), cycles.sortedBy { -it.size }[0])
     }
@@ -35,7 +35,7 @@ class TestFindingCyclesInGraph {
         graph.addEdge(3, 4)
         graph.addEdge(4, 2) // Создаем цикл 2 -> 3 -> 4 -> 2
 
-        val cycles = graph.findCyclesFromNode(1)
+        val cycles = graph.findCyclesFromNode(1, true)
         assertEquals(2, cycles.size)
         assertEquals(listOf(1, 2, 3), cycles.sortedBy { -it.size }[0])
     }
@@ -51,7 +51,7 @@ class TestFindingCyclesInGraph {
         graph.addEdge(2, 3)
         graph.addEdge(3, 4)
 
-        val cycles = graph.findCyclesFromNode(1)
+        val cycles = graph.findCyclesFromNode(1,true )
         assertEquals(1, cycles.filter { it[0] == 1 }.size)
     }
 
@@ -60,7 +60,7 @@ class TestFindingCyclesInGraph {
         val graph = Graph()
         graph.addNode(1)
 
-        val cycles = graph.findCyclesFromNode(1)
+        val cycles = graph.findCyclesFromNode(1, true)
         assertEquals(0, cycles.size)
     }
 
@@ -74,7 +74,7 @@ class TestFindingCyclesInGraph {
         graph.addEdge(1, 2)
         graph.addEdge(3, 4)
 
-        val cycles = graph.findCyclesFromNode(1)
+        val cycles = graph.findCyclesFromNode(1, true)
         assertEquals(1, cycles.size)
     }
 }

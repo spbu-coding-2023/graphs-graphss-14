@@ -176,7 +176,7 @@ open class Graph {
 
         return betweenness
     }
-    fun findCyclesFromNode(node: Int): List<List<Int>> { // МАТАВЭЙ а почему пол алгоритма от твоего имени???
+    fun findCyclesFromNode(node: Int, isDirected: Boolean): List<List<Int>> {
         val cycles = mutableListOf<List<Int>>()
         val visited = mutableSetOf<Int>()
         val path = mutableListOf<Int>()
@@ -201,7 +201,9 @@ open class Graph {
         }
 
         dfs(node)
-
+    if (isDirected){
         return cycles
+    } else
+        return cycles.filter{it.size > 2}
     }
 }

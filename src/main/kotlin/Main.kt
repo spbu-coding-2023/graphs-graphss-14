@@ -573,7 +573,7 @@ fun app(saves : WindowStateData, selectedFile: String?) {
                     shortestWay.value = listOf()
                     val hitCircle = findInMap(circlesToDraw, circleRadius, offset)
                     if (hitCircle != null && isCyclesFromNode){
-                        cyclesFromNode.value = wgraph.findCyclesFromNode(hitCircle)
+                        cyclesFromNode.value = wgraph.findCyclesFromNode(hitCircle,false)
                         logger.info {cyclesFromNode}
                     }
                     else
