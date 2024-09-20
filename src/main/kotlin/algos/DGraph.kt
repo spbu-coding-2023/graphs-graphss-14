@@ -4,9 +4,10 @@ import java.util.*
 
 open class DiGraph() : WGraph(){
 
-    override fun addEdge(n: Int, m: Int) {
+    override fun addEdge(n: Int, m: Int, weight: Int) {
         if (Pair(n, m) !in edges) {
             edges.add(Pair(n, m))
+            weights[Pair(n, m)] = weight
             adjacencyList.getOrPut(n) { mutableListOf() }.add(m)
         }
     }
@@ -39,7 +40,6 @@ open class DiGraph() : WGraph(){
         }
 
         dfs(node)
-        println(cycles)
         return cycles
     }
 

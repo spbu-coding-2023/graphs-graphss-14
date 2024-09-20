@@ -306,12 +306,8 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
         saves.linesToDraw.forEach{(key, data) ->
             linesToDraw[key] = Pair(Pair(data.first.x.toDp(density), data.first.y.toDp(density)),
                 Pair(data.second.x.toDp(density), data.second.y.toDp(density)))
-            if (!saves.graphMode){
-                graph.addEdge(key.first, key.second, 1)
-            }
-            else {
-                graph.addEdge(key.first, key.second)
-            }
+            graph.addEdge(key.first, key.second, 1)
+
         }
         firstTime.value = false
     }
@@ -423,6 +419,7 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                         isColorsForBeetweenes = true
                         expanded = false
                         additionalOptionsGroup1 = false
+
                     }) {
                         Text("Выделение сообществ (не работает)", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
@@ -458,7 +455,7 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                         expanded = false
                         additionalOptionsGroup2 = false
                         bridges.value = graph.findBridges()
-                        println("${bridges.value}, ${saves.graphMode}, ${graph}")
+                        selectedOption = 0
                     }) {
                         Text("Поиск мостов", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
@@ -467,6 +464,7 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                         expanded = false
                         additionalOptionsGroup2 = false
                         isCyclesFromNode = true
+                        selectedOption = 0
 
                     }) {
                         Text("Поиск циклов для заданной вершины", color = colorStates[4], fontSize = 12.sp * scaleFactor)
@@ -475,6 +473,7 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                         logger.info { "Additional Option 1 clicked" }
                         expanded = false
                         additionalOptionsGroup3 = false
+                        selectedOption = 0
                     }) {
                         Text("Построение минимального остовного дерева (не работает)", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
@@ -704,11 +703,8 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                                                         circlesToDraw[endConnectingPoint]!!
                                                     )
                                             }
-                                            if(saves.graphMode){
-                                                graph.addEdge(startConnectingPoint!!,endConnectingPoint!!)
-                                            }else{
-                                                graph.addEdge(startConnectingPoint!!, endConnectingPoint!!, 1)
-                                            }
+                                            graph.addEdge(startConnectingPoint!!,endConnectingPoint!!, 1)
+
                                         }
                                         startConnectingPoint = null
                                         endConnectingPoint = null
@@ -1099,7 +1095,6 @@ fun main() = application {
             val initialData = if (selectedFile != null) {
                 loadFromFile(selectedFile!!.name)
             } else {
-                println(graphMode)
                 WindowStateData(graphMode = graphMode, circlesToDraw = mapOf(), linesToDraw = mapOf(), switchState = false, nodeCounter = 0)
             }
             app(initialData, selectedFile?.name)

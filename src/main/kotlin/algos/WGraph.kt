@@ -5,7 +5,7 @@ import java.util.*
 open class WGraph : Graph() {
     val weights = mutableMapOf<Pair<Int, Int>, Int>()
 
-    fun addEdge(n: Int, m: Int, weight: Int) {
+    open fun addEdge(n: Int, m: Int, weight: Int) {
         super.addEdge(n, m)
         weights[Pair(n, m)] = weight
         weights[Pair(m, n)] = weight // Если граф ненаправленный
