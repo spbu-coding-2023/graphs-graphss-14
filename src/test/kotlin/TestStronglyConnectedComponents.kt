@@ -18,7 +18,7 @@ class TestStronglyConnectedComponents{
         graph.addEdge(3, 4)
         graph.addEdge(4, 4)
 
-        val sccs = findSCCs(graph)
+        val sccs = graph.findSCCs()
         assertEquals(2, sccs.size)
         assertEquals(true, sccs.any { it.containsAll(listOf(1, 2, 3)) })
         assertEquals(true, sccs.any { it.containsAll(listOf(4)) })
@@ -27,7 +27,7 @@ class TestStronglyConnectedComponents{
     @Test
     fun `test Find SCCs Empty Graph`() {
         val graph = DiGraph()
-        val sccs = findSCCs(graph)
+        val sccs = graph.findSCCs()
         assertEquals(0, sccs.size)
     }
 
@@ -35,7 +35,7 @@ class TestStronglyConnectedComponents{
     fun `test Find SCCs Single Node`() {
         val graph = DiGraph()
         graph.addNode(1)
-        val sccs = findSCCs(graph)
+        val sccs = graph.findSCCs()
         assertEquals(1, sccs.size)
         assertEquals(true, sccs.any { it.contains(1) })
     }
@@ -50,7 +50,7 @@ class TestStronglyConnectedComponents{
         graph.addEdge(2, 1)
         graph.addEdge(3, 3)
 
-        val sccs = findSCCs(graph)
+        val sccs = graph.findSCCs()
         assertEquals(2, sccs.size)
         assertEquals(true, sccs.any { it.containsAll(listOf(1, 2)) })
         assertEquals(true, sccs.any { it.containsAll(listOf(3)) })
@@ -72,7 +72,7 @@ class TestStronglyConnectedComponents{
         graph.addEdge(5, 6)
         graph.addEdge(6, 4)
 
-        val sccs = findSCCs(graph)
+        val sccs = graph.findSCCs()
         assertEquals(2, sccs.size)
         assertEquals(true, sccs.any { it.containsAll(listOf(1, 2, 3)) })
         assertEquals(true, sccs.any { it.containsAll(listOf(4, 5, 6)) })
@@ -88,7 +88,7 @@ class TestStronglyConnectedComponents{
         graph.addEdge(2, 3)
         graph.addEdge(3, 1)
 
-        val sccs = findSCCs(graph)
+        val sccs = graph.findSCCs()
         assertEquals(1, sccs.size)
         assertEquals(true, sccs.any { it.containsAll(listOf(1, 2, 3)) })
     }
@@ -100,7 +100,7 @@ class TestStronglyConnectedComponents{
         graph.addNode(2)
         graph.addNode(3)
 
-        val sccs = findSCCs(graph)
+        val sccs = graph.findSCCs()
         assertEquals(3, sccs.size)
         assertEquals(true, sccs.any { it.contains(1) })
         assertEquals(true, sccs.any { it.contains(2) })
@@ -117,7 +117,7 @@ class TestStronglyConnectedComponents{
         graph.addEdge(2, 2)
         graph.addEdge(3, 3)
 
-        val sccs = findSCCs(graph)
+        val sccs = graph.findSCCs()
         assertEquals(3, sccs.size)
         assertEquals(true, sccs.any { it.contains(1) })
         assertEquals(true, sccs.any { it.contains(2) })
@@ -134,7 +134,7 @@ class TestStronglyConnectedComponents{
         }
         graph.addEdge(nodes.last(), nodes.first())
 
-        val sccs = findSCCs(graph)
+        val sccs = graph.findSCCs()
         assertEquals(1, sccs.size)
         assertEquals(true, sccs.any { it.containsAll(nodes) })
     }
