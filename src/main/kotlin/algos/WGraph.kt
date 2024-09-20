@@ -2,7 +2,7 @@ package algos
 
 import java.util.*
 
-class WGraph : Graph() {
+open class WGraph : Graph() {
     val weights = mutableMapOf<Pair<Int, Int>, Int>()
 
     fun addEdge(n: Int, m: Int, weight: Int) {

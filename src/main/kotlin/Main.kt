@@ -33,6 +33,7 @@ import kotlin.math.sqrt
 import kotlin.random.Random
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import kotlin.math.min
@@ -43,6 +44,49 @@ import java.awt.FileDialog
 import java.awt.Frame
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+
+fun DrawScope.drawArrow(color: Color, start: Offset, end: Offset, n: Dp) {
+    val arrowHeadSize = 10.dp.toPx()
+    val angle = Math.atan2((end.y - start.y).toDouble(), (end.x - start.x).toDouble())
+
+    // Преобразуем n в пиксели
+    val nPx = n.toPx()
+
+    // Вычисляем новую конечную точку с учетом отступа n
+    val newEnd = Offset(
+        (end.x - nPx * Math.cos(angle)).toFloat(),
+        (end.y - nPx * Math.sin(angle)).toFloat()
+    )
+
+    drawLine(
+        color = color,
+        start = start,
+        end = newEnd,
+        strokeWidth = 2.dp.toPx()
+    )
+
+    val arrowHead1 = Offset(
+        (newEnd.x - arrowHeadSize * Math.cos(angle - Math.PI / 6)).toFloat(),
+        (newEnd.y - arrowHeadSize * Math.sin(angle - Math.PI / 6)).toFloat()
+    )
+    val arrowHead2 = Offset(
+        (newEnd.x - arrowHeadSize * Math.cos(angle + Math.PI / 6)).toFloat(),
+        (newEnd.y - arrowHeadSize * Math.sin(angle + Math.PI / 6)).toFloat()
+    )
+
+    drawLine(
+        color = color,
+        start = newEnd,
+        end = arrowHead1,
+        strokeWidth = 2.dp.toPx()
+    )
+    drawLine(
+        color = color,
+        start = newEnd,
+        end = arrowHead2,
+        strokeWidth = 2.dp.toPx()
+    )
+}
 
 fun Float.toDp(density: Density): Dp {
     return with(density) { this@toDp.toDp() }
@@ -79,6 +123,7 @@ data class CircleData(
 //инфа про текущее состояние графа (для сохранения) (можно добавить еще какой-то инфы)
 @Serializable
 data class WindowStateData(
+    val graphMode : Boolean,
     val circlesToDraw: Map<Int,CircleData>,
     val linesToDraw: Map<Pair<Int, Int>, Pair<CircleData, CircleData>>,
     val switchState: Boolean,
@@ -87,13 +132,14 @@ data class WindowStateData(
 
 //ну собсна сохранение в формат .json
 fun saveToFile(
+    graphMode: Boolean,
     circlesToDraw: Map<Int, CircleData>,
     linesToDraw: Map<Pair<Int, Int>, Pair<CircleData, CircleData>>,
     switchState: Boolean,
     nodeCounter: Int,
     fileName : String?
 ) {
-    val data = WindowStateData( circlesToDraw, linesToDraw, switchState, nodeCounter)
+    val data = WindowStateData(graphMode, circlesToDraw, linesToDraw, switchState, nodeCounter)
     val json = Json{
         allowStructuredMapKeys = true
     }.
@@ -152,9 +198,9 @@ private val logger = KotlinLogging.logger {}
 //основной код
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun app(saves : WindowStateData, selectedFile: String?) {
+fun app(savesData : WindowStateData, selectedFile: String?) {
     val firstTime = remember { mutableStateOf(true) }
-
+    val saves by remember { mutableStateOf(savesData) }
     // Вся инфа которую нужно хранить
     val windowState = rememberWindowState()
     val density = LocalDensity.current
@@ -164,7 +210,7 @@ fun app(saves : WindowStateData, selectedFile: String?) {
     var circlesToDraw by remember { mutableStateOf(mutableMapOf<Int, Pair<Dp, Dp>>()) }
     var colorsForBeetweenes by remember { mutableStateOf(mapOf<Int, Float>()) }
     var linesToDraw by remember { mutableStateOf(mutableMapOf<Pair<Int, Int>, Pair<Pair<Dp, Dp>, Pair<Dp, Dp>>>()) }
-    val wgraph = remember { WGraph() }
+    var graph by remember { mutableStateOf( WGraph()) }
 
 
     val bridges = remember { mutableStateOf(listOf<Pair<Int, Int>>()) }
@@ -194,6 +240,7 @@ fun app(saves : WindowStateData, selectedFile: String?) {
     var iconStates by remember { mutableStateOf( false) }
     var sccsFlag by remember { mutableStateOf( false) }
     val scaleFactor = windowHeight / 600.dp
+    
     val colorStates by remember { // цвет темы
         mutableStateOf(
             mutableListOf(
@@ -245,18 +292,26 @@ fun app(saves : WindowStateData, selectedFile: String?) {
     var selectedOption by remember { mutableStateOf(1) }
     var nodeCounter by remember { mutableStateOf(0) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
-
+    
     if (firstTime.value){
+        if(saves.graphMode) {
+            graph =  DiGraph()
+        }
         switchState = saves.switchState
         nodeCounter = saves.nodeCounter
         saves.circlesToDraw.forEach { (key, data) ->
             circlesToDraw[key] = Pair(data.x.toDp(density), data.y.toDp(density))
-            wgraph.addNode(key)
+            graph.addNode(key)
         }
         saves.linesToDraw.forEach{(key, data) ->
             linesToDraw[key] = Pair(Pair(data.first.x.toDp(density), data.first.y.toDp(density)),
                 Pair(data.second.x.toDp(density), data.second.y.toDp(density)))
-            wgraph.addEdge(key.first, key.second, 1)
+            if (!saves.graphMode){
+                graph.addEdge(key.first, key.second, 1)
+            }
+            else {
+                graph.addEdge(key.first, key.second)
+            }
         }
         firstTime.value = false
     }
@@ -344,7 +399,7 @@ fun app(saves : WindowStateData, selectedFile: String?) {
                         Text("Разложить граф случайно", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
                     DropdownMenuItem(onClick = {
-                        val qwerty = Graph.SpringEmbedder().layout(wgraph)
+                        val qwerty = Graph.SpringEmbedder().layout(graph)
                         //раскладка графа алгоритмом от Руслана
                         circlesToDraw.forEach { (key, _) ->
                             circlesToDraw[key] = Pair(
@@ -362,7 +417,7 @@ fun app(saves : WindowStateData, selectedFile: String?) {
                     }
                     DropdownMenuItem(onClick = {
                         logger.info { "Additional Option 2 clicked" }
-                        colorsForBeetweenes = wgraph.betweennessCentrality()
+                        colorsForBeetweenes = graph.betweennessCentrality()
                         logger.info { colorsForBeetweenes }
 
                         isColorsForBeetweenes = true
@@ -392,7 +447,7 @@ fun app(saves : WindowStateData, selectedFile: String?) {
                     DropdownMenuItem(onClick = { //выделение сообществ
                         logger.info { "Additional Option 3 clicked" }
                         expanded = false
-                        nodesInClusters = wgraph.betweennessCentrality()
+                        nodesInClusters = graph.betweennessCentrality()
                         isNodesClustering = true
                         logger.info { nodesInClusters }
                     }) {
@@ -402,7 +457,8 @@ fun app(saves : WindowStateData, selectedFile: String?) {
                         logger.info { "Additional Option 2 clicked" }
                         expanded = false
                         additionalOptionsGroup2 = false
-                        bridges.value = wgraph.findBridges()
+                        bridges.value = graph.findBridges()
+                        println("${bridges.value}, ${saves.graphMode}, ${graph}")
                     }) {
                         Text("Поиск мостов", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
@@ -488,21 +544,21 @@ fun app(saves : WindowStateData, selectedFile: String?) {
                         1 -> { // в стеке действий код 1 значит создание узла (значит мы удаляем)
                             circlesToDraw.remove(lastAction.data as Int)
                             nodeCounter--
-                            wgraph.removeNode(lastAction.data)
+                            graph.removeNode(lastAction.data)
                         }
 
                         2 -> { // отмена линии
                             val (start, end) = lastAction.data as Pair<*, *>
                             linesToDraw.remove(Pair(start, end))
-                            wgraph.removeEdge(start as Int, end as Int)
+                            graph.removeEdge(start as Int, end as Int)
                         }
 
                         3 ->{ // отмена передвижения
                             val (key, pos,lines) = lastAction.data as Triple<Int,Pair<Dp,Dp>,List<Pair<Int,Int>>>
                             circlesToDraw[key] = pos
-                            wgraph.addNode(key)
+                            graph.addNode(key)
                             for (i in lines){
-                                wgraph.addEdge(i.first,i.second, 1)
+                                graph.addEdge(i.first,i.second, 1)
                                 linesToDraw[i] = Pair(circlesToDraw[i.first]!!, circlesToDraw[i.second]!!)
                             }
                         }
@@ -526,21 +582,21 @@ fun app(saves : WindowStateData, selectedFile: String?) {
                             1 -> {
                                 circlesToDraw.remove(lastAction.data as Int)
                                 nodeCounter--
-                                wgraph.removeNode(lastAction.data)
+                                graph.removeNode(lastAction.data)
                             }
 
                             2 -> {
                                 val (start, end) = lastAction.data as Pair<*, *>
                                 linesToDraw.remove(Pair(start, end))
-                                wgraph.removeEdge(start as Int, end as Int)
+                                graph.removeEdge(start as Int, end as Int)
                             }
 
                             3 ->{
                                 val (key, pos,lines) = lastAction.data as Triple<Int,Pair<Dp,Dp>,List<Pair<Int,Int>>>
                                 circlesToDraw[key] = pos
-                                wgraph.addNode(key)
+                                graph.addNode(key)
                                 for (i in lines){
-                                    wgraph.addEdge(i.first,i.second, 1)
+                                    graph.addEdge(i.first,i.second, 1)
                                     linesToDraw[i] = Pair(circlesToDraw[i.first]!!, circlesToDraw[i.second]!!)
                                 }
                             }
@@ -569,12 +625,11 @@ fun app(saves : WindowStateData, selectedFile: String?) {
                     openSettings = false
                     bridges.value = listOf()
                     isColorsForBeetweenes = false
-                    cyclesFromNode.value = listOf()
                     shortestWay.value = listOf()
                     val hitCircle = findInMap(circlesToDraw, circleRadius, offset)
                     if (hitCircle != null && isCyclesFromNode){
-                        cyclesFromNode.value = wgraph.findCyclesFromNode(hitCircle,false)
-                        logger.info {cyclesFromNode}
+                        cyclesFromNode.value = graph.findCyclesFromNode(hitCircle)
+                        logger.info {graph.findCyclesFromNode(hitCircle)}
                     }
                     else
                         isCyclesFromNode = false
@@ -585,9 +640,9 @@ fun app(saves : WindowStateData, selectedFile: String?) {
                             } else if (endConnectingPoint == null && startConnectingPoint != hitCircle) {
                                 endConnectingPoint = hitCircle
                                 val temp: List<Int>? = if (isNodesToFindWayD.value) {
-                                    wgraph.shortestPathD(startConnectingPoint!!, endConnectingPoint!!)
+                                    graph.shortestPathD(startConnectingPoint!!, endConnectingPoint!!)
                                 } else {
-                                    wgraph.shortestPathBF(startConnectingPoint!!, endConnectingPoint!!)
+                                    graph.shortestPathBF(startConnectingPoint!!, endConnectingPoint!!)
                                 }
                                 if (temp != null) {
                                     shortestWay.value = temp
@@ -616,7 +671,7 @@ fun app(saves : WindowStateData, selectedFile: String?) {
                                 circlesToDraw = circlesToDraw.toMutableMap()
                                     .apply { this[nodeCounter] = Pair(offset.x.toDp(), offset.y.toDp()) }
                                 logger.info { offset }
-                                wgraph.addNode(nodeCounter)
+                                graph.addNode(nodeCounter)
                                 nodeCounter += 1
 
                             }
@@ -631,7 +686,7 @@ fun app(saves : WindowStateData, selectedFile: String?) {
                                         startConnectingPoint = hitCircle
                                     } else if (endConnectingPoint == null && startConnectingPoint != hitCircle) {
                                         endConnectingPoint = hitCircle
-                                        if (!(Pair(endConnectingPoint, startConnectingPoint) in linesToDraw || Pair(
+                                        if ((!(Pair(endConnectingPoint, startConnectingPoint) in linesToDraw && !saves.graphMode)|| Pair(
                                                 startConnectingPoint,
                                                 endConnectingPoint
                                             ) in linesToDraw)
@@ -649,7 +704,11 @@ fun app(saves : WindowStateData, selectedFile: String?) {
                                                         circlesToDraw[endConnectingPoint]!!
                                                     )
                                             }
-                                            wgraph.addEdge(startConnectingPoint!!, endConnectingPoint!!, 1)
+                                            if(saves.graphMode){
+                                                graph.addEdge(startConnectingPoint!!,endConnectingPoint!!)
+                                            }else{
+                                                graph.addEdge(startConnectingPoint!!, endConnectingPoint!!, 1)
+                                            }
                                         }
                                         startConnectingPoint = null
                                         endConnectingPoint = null
@@ -747,7 +806,7 @@ fun app(saves : WindowStateData, selectedFile: String?) {
                 val canvasWidth = size.width
                 val canvasHeight = size.height
                 // Отрисовка линий
-                val allPairs = cyclesFromNode.value.flatMap { cycle ->
+                val allPairs = cyclesFromNode.value.toMutableList().flatMap { cycle ->
                     val pairs = cycle.zipWithNext().map { (a, b) -> Pair(a, b) }
                     if (cycle.size > 1) {
                         pairs + Pair(cycle.last(), cycle.first())
@@ -766,6 +825,7 @@ fun app(saves : WindowStateData, selectedFile: String?) {
                     if (Pair(key.first, key.second) in shortway || Pair(key.second, key.first) in shortway) {
                         col = Color.Green
                     }
+                    if (!saves.graphMode){
                     drawLine(
                         color = col,
                         start = Offset(
@@ -777,7 +837,21 @@ fun app(saves : WindowStateData, selectedFile: String?) {
                             value.second.second.value - canvasHeight / 2
                         ),
                         strokeWidth = 2f
-                    )
+                    )}
+                    else{
+                        drawArrow(
+                            color = col,
+                            start = Offset(
+                                value.first.first.value - canvasWidth / 2,
+                                value.first.second.value - canvasHeight / 2
+                            ),
+                            end = Offset(
+                                value.second.first.value - canvasWidth / 2,
+                                value.second.second.value - canvasHeight / 2
+                            ),
+                            circleRadius
+                        )
+                    }
                 }
 
                 // Отрисовка кругов
@@ -844,7 +918,6 @@ fun app(saves : WindowStateData, selectedFile: String?) {
                 }
             }
             cyclesFromNode.value = listOf()
-            //nodesInClusters = mapOf()
 
 // Отображаем всплывающее окно, если круг выбран
             selectedCircle?.let { key ->
@@ -863,7 +936,7 @@ fun app(saves : WindowStateData, selectedFile: String?) {
                             Text("Редактирование узла", color = colorStates[4])
                             // вот сюда можно добавить еще всякого полезного, типа настройки веса ребра как нибудь, я не придумал)
                             Button(onClick = {
-                                wgraph.removeNode(key)
+                                graph.removeNode(key)
                                 val listToRemove = mutableListOf<Pair<Int,Int>>()
                                 for ( i in linesToDraw.keys){
                                     if (i.first == key || i.second == key){
@@ -935,7 +1008,7 @@ fun app(saves : WindowStateData, selectedFile: String?) {
                                 )
                                 )
                             }
-                            saveToFile(circlesToDrawInPixels,
+                            saveToFile(graphMode = saves.graphMode ,circlesToDrawInPixels,
                                 linesToDrawInPixels,
                                 switchState,
                                 nodeCounter,
@@ -953,22 +1026,45 @@ fun app(saves : WindowStateData, selectedFile: String?) {
 }
 
 @Composable
-fun mainScreen(onStartClick: () -> Unit, onFileSelected: (File?) -> Unit) {
+fun mainScreen(onStartClick: () -> Unit, onFileSelected: (File?) -> Unit, onGraphModeSelected: (Boolean) -> Unit) {
     var selectedFile by remember { mutableStateOf<File?>(null) }
     val saveDirectory = File("src/main/resources/save/")
-
+    var graphMode by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text("Выберите режим графа для создания")
+        Row(verticalAlignment = Alignment.CenterVertically){
+            RadioButton(
+                selected = graphMode,
+                onClick = {
+                    graphMode = true
+                    onGraphModeSelected(true)
+                }
+            )
+            Text("Ориентированный")
+            Spacer(modifier = Modifier.width(16.dp))
+            RadioButton(
+                selected = !graphMode,
+                onClick = {
+                    graphMode = false
+                    onGraphModeSelected(false)
+                }
+            )
+            Text("Неориентированный")
+        }
+
         Button(onClick = onStartClick) {
             Text("Построить граф")
         }
         Button(onClick = { selectedFile = chooseFile(saveDirectory); onFileSelected(selectedFile) }) {
             Text("Загрузить сохранение")
         }
-
         selectedFile?.let { file ->
             onFileSelected(file)
         }
@@ -983,25 +1079,28 @@ fun main() = application {
 
     var showMainScreen by remember { mutableStateOf(true) }
     var selectedFile by remember { mutableStateOf<File?>(null) }
+    var graphMode by remember { mutableStateOf(false) }
 
     if (showMainScreen) {
         Window(onCloseRequest = ::exitApplication) {
             mainScreen(
                 onStartClick = { showMainScreen = false },
-                onFileSelected = { file -> selectedFile = file; showMainScreen = false }
+                onFileSelected = { file -> selectedFile = file; showMainScreen = false },
+                onGraphModeSelected = { mode -> graphMode = mode }
             )
         }
     } else {
         Window(
             onCloseRequest = ::exitApplication,
             state = rememberWindowState(size = windowSize),
-            title = "The best graph visualizer",
+            title = "Connect-a-Lot",
             focusable = true
         ) {
             val initialData = if (selectedFile != null) {
                 loadFromFile(selectedFile!!.name)
             } else {
-                WindowStateData(circlesToDraw = mapOf(), linesToDraw = mapOf(), switchState = false, nodeCounter = 0)
+                println(graphMode)
+                WindowStateData(graphMode = graphMode, circlesToDraw = mapOf(), linesToDraw = mapOf(), switchState = false, nodeCounter = 0)
             }
             app(initialData, selectedFile?.name)
         }
