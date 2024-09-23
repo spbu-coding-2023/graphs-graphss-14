@@ -180,29 +180,31 @@ open class Graph {
 
         return betweenness
     }
-    fun findCyclesFromNode(startNode: Int): List<List<Int>> {
+    fun findCyclesFromNode(node: Int): List<List<Int>> { // МАТАВЭЙ а почему пол алгоритма от твоего имени???
         val cycles = mutableListOf<List<Int>>()
         val visited = mutableSetOf<Int>()
         val path = mutableListOf<Int>()
 
-        fun dfs(node: Int) {
-            visited.add(node)
-            path.add(node)
+        fun dfs(currentNode: Int) {
+            visited.add(currentNode)
+            path.add(currentNode)
 
-            for (neighbor in adjacencyList[node] ?: emptyList()) {
+            for (neighbor in adjacencyList[currentNode] ?: emptyList()) {
                 if (!visited.contains(neighbor)) {
                     dfs(neighbor)
                 } else if (path.contains(neighbor)) {
                     // Cycle detected
                     val cycle = path.slice(path.indexOf(neighbor) until path.size)
-                    cycles.add(cycle)
+                    if (cycle.contains(node)) {
+                        cycles.add(cycle)
+                    }
                 }
             }
 
             path.removeAt(path.size - 1)
         }
 
-        dfs(startNode)
+        dfs(node)
 
         return cycles
     }
@@ -217,6 +219,8 @@ fun main(){
     graph.addEdge(2, 3)
     graph.addEdge(3, 1) // Создаем цикл 1 -> 2 -> 3 -> 1
     graph.addEdge(3, 4)
+    graph.addEdge(2, 4)
+    graph.addEdge(4, 1)
     graph.addEdge(4, 2) // Создаем цикл 2 -> 3 -> 4 -> 2
 
     println(graph.findCyclesFromNode(1))

@@ -1,6 +1,8 @@
+import algos.DiGraph
 import mu.KotlinLogging
 import algos.Graph
 import algos.WGraph
+import algos.findSCCs
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -88,7 +90,8 @@ fun saveToFile(
     val data = WindowStateData( circlesToDraw, linesToDraw, switchState, nodeCounter)
     val json = Json{
         allowStructuredMapKeys = true
-    }.encodeToString(data)
+    }.
+    encodeToString(value = data)
     val directory = File("src/main/resources/save/")
     directory.mkdirs()
 
@@ -124,6 +127,10 @@ fun app() {
     val isNodesToFindWay = remember { mutableStateOf(false) }
     val isNodesToFindWayD = remember { mutableStateOf(false) }
     val shortestWay = remember { mutableStateOf(listOf<Int>()) }
+    val cyclesFromNode  = remember { mutableStateOf(listOf<List<Int>>()) }
+    var isCyclesFromNode  by remember { mutableStateOf(false) }
+    var isNodesClustering  by remember { mutableStateOf(false) }
+    var nodesInClusters by remember { mutableStateOf(mapOf<Int, Float>()) }
 
     var selectedCircle by remember { mutableStateOf<Int?>(null) }
     var isDragging by remember { mutableStateOf(false) }
@@ -137,8 +144,12 @@ fun app() {
     var additionalOptionsGroup3 by remember { mutableStateOf(false) }
     var openSettings by remember { mutableStateOf(false) }
     var isColorsForBeetweenes by remember { mutableStateOf(false) }
+    var sccs by remember {mutableStateOf(mapOf<List<Int>, Color>())}
     var switchState by remember { mutableStateOf(false) }
     var turnBack by remember { mutableStateOf(false) }
+    var iconStates by remember { mutableStateOf( false) }
+    var sccsFlag by remember { mutableStateOf( false) }
+    val scaleFactor = windowHeight / 600.dp
     val colorStates by remember { // цвет темы
         mutableStateOf(
             mutableListOf(
@@ -146,22 +157,49 @@ fun app() {
                 Color.Red,
                 Color.Blue,
                 Color.Gray,
-                Color.Black
+                Color.Black,
             )
         )
     }
+fun findSCCsInGraph()  :  Map<List<Int>, Color>{
+    val diGraph = DiGraph()
+    circlesToDraw.keys.forEach { diGraph.addNode(it) }
+    linesToDraw.keys.forEach { diGraph.addEdge(it.first, it.second) }
+    linesToDraw.keys.forEach { diGraph.addEdge(it.second, it.first) }
+
+    logger.info { "Nodes: ${diGraph.nodes}" }
+    logger.info { "Edges: ${diGraph.edges}" }
+
+    val sccst = findSCCs(diGraph).filter{it.size > 1}.sortedBy { it.size }.associateWith { Color(
+            Random.nextInt(50, 200),
+            Random.nextInt(50, 200),
+            Random.nextInt(50, 200)
+        )}
+
+    logger.info {"SCCs: ${sccst.keys}"}
+    return sccst
+}
+    /*
+
+    val firstImage = if (switchState) painterResource(image1) else painterResource(imageBlack)
+
+    Image(painter = firstImage)
+
+    */
     if (switchState) { // тут в зависимости от переключателя в настройках выбирается тема
         colorStates[0] = Color.Black
         colorStates[1] = Color.Red
         colorStates[2] = Color.Yellow
         colorStates[3] = Color.LightGray
         colorStates[4] = Color.White
+        iconStates = false
     } else {
         colorStates[0] = Color.White
         colorStates[1] = Color.Red
         colorStates[2] = Color.Blue
         colorStates[3] = Color.Gray
         colorStates[4] = Color.Black
+        iconStates = true
     }
 
     val actionStack = remember { mutableStateListOf<Action>() }
@@ -187,11 +225,17 @@ fun app() {
                 additionalOptionsGroup3 = false
                 bridges.value = listOf()
                 shortestWay.value = listOf()
+
             }) {
+                val imageResource = if (iconStates) {
+                    painterResource("img/logo(Black).png")
+                } else {
+                    painterResource("img/logo(white).png")
+                }
                 Image( // Кортинка
-                    painter = painterResource("img/settings.png"), // Замените на путь к вашему изображению
-                    contentDescription = "Settings",
-                    modifier = Modifier.size(32.dp) // Размер изображения
+                    painter = imageResource,
+                    contentDescription = "Параметры",
+                    modifier = Modifier.size(30.dp * scaleFactor) // Размер изображения
                 )
             } // конец кнопки настроек
 
@@ -199,9 +243,9 @@ fun app() {
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
                 modifier = Modifier.background(colorStates[0]).padding(1.dp).waterfallPadding().shadow(
-                    elevation = 4.dp,
+                    elevation = 8.dp,
                     spotColor = colorStates[4],
-                    ambientColor = colorStates[0]
+                    ambientColor = colorStates[0],
                 )
 
             ) {
@@ -211,9 +255,25 @@ fun app() {
                     additionalOptionsGroup2 = false
                     additionalOptionsGroup3 = false
                 }) {
-                    Text("Основная группа", color = colorStates[4])
+                    Text("Работающие алгоритмы", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                 }
                 if (additionalOptionsGroup1) {
+                    DropdownMenuItem(onClick = {
+                        logger.info { "Addtional Option" }
+                        expanded = false
+                        isNodesToFindWayD.value = true
+                        additionalOptionsGroup1 = false
+                    }){
+                        Text("Дейкстра", color = colorStates[4], fontSize = 12.sp * scaleFactor)
+                    }
+                    DropdownMenuItem(onClick = {
+                        logger.info { "Addtional Option" }
+                        expanded = false
+                        isNodesToFindWay.value = true
+                        additionalOptionsGroup1 = false
+                    }) {
+                        Text("Форд-Беллман", color = colorStates[4], fontSize = 12.sp * scaleFactor)
+                    }
                     DropdownMenuItem(onClick = {
                         // случайная раскладка графа на плоскости
                         circlesToDraw.forEach { (key, _) ->
@@ -228,15 +288,15 @@ fun app() {
                         expanded = false
                         additionalOptionsGroup1 = false
                     }) {
-                        Text("Разложить граф случайно", color = colorStates[4])
+                        Text("Разложить граф случайно", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
                     DropdownMenuItem(onClick = {
                         val qwerty = Graph.SpringEmbedder().layout(wgraph)
                         //раскладка графа алгоритмом от Руслана
                         circlesToDraw.forEach { (key, _) ->
                             circlesToDraw[key] = Pair(
-                                Dp(qwerty[key]!!.first.toFloat() * windowWidth.value / 20 + windowWidth.value / 2),
-                                Dp(qwerty[key]!!.second.toFloat() * windowHeight.value / 20 + windowHeight.value / 2)
+                                Dp(qwerty[key]!!.first.toFloat() * windowWidth.value / 30 + windowWidth.value / 2),
+                                Dp(qwerty[key]!!.second.toFloat() * windowHeight.value / 30 + windowHeight.value / 2)
                             )
                         }
                         linesToDraw.forEach { (key, _) ->
@@ -245,7 +305,7 @@ fun app() {
                         expanded = false
                         additionalOptionsGroup1 = false
                     }) {// название поменять, на название алгоритма
-                        Text("Разложить граф случайно по умному", color = colorStates[4])
+                        Text("Spring Embedder (Раскладка графа)", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
                     DropdownMenuItem(onClick = {
                         logger.info { "Additional Option 2 clicked" }
@@ -256,17 +316,7 @@ fun app() {
                         expanded = false
                         additionalOptionsGroup1 = false
                     }) {
-                        Text("Ключевые вершины", color = colorStates[4])
-                    }
-                    DropdownMenuItem(onClick = { //выделение сообществ (его нет, сделать)
-                        logger.info { "Additional Option 3 clicked" }
-                        expanded = false
-                        //colorsForClusters = Graph.ClusteredGraph.
-//                        //graph.clusterGraph()
-//                        //graph.colorClusters()
-                        //additionalOptionsGroup1 = false
-                    }) {
-                        Text("Выделение сообществ", color = colorStates[4])
+                        Text("Выделение сообществ", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
                 }
                 DropdownMenuItem(onClick = {
@@ -275,15 +325,25 @@ fun app() {
                     additionalOptionsGroup1 = false
                     additionalOptionsGroup3 = false
                 }) {
-                    Text("Группа алгоритмов 1", color = colorStates[4])
+                    Text("Группа нерабочих", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                 }
                 if (additionalOptionsGroup2) {
-                    DropdownMenuItem(onClick = {// выделение компоненты сильной связности (Сделать!)
+                    DropdownMenuItem(onClick = {// выделение компоненты сильной связности (Сделать!) //Сделал)))
                         logger.info { "Additional Option 1 clicked" }
                         expanded = false
                         additionalOptionsGroup2 = false
+                        sccs = findSCCsInGraph()
+                        sccsFlag = true }) {
+                        Text("Выделение компонент сильной связности", color = colorStates[4], fontSize = 12.sp * scaleFactor)
+                    }
+                    DropdownMenuItem(onClick = { //выделение сообществ (его нет, сделать). А это пусть Олег делает... если сделает...
+                        logger.info { "Additional Option 3 clicked" }
+                        expanded = false
+                        nodesInClusters = wgraph.betweennessCentrality()
+                        isNodesClustering = true
+                        logger.info { nodesInClusters }
                     }) {
-                        Text("Выделение компонент сильной связности", color = colorStates[4])
+                        Text("Ключевые вершины", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
                     DropdownMenuItem(onClick = { //  поиск мостов (как работают - смотреть в /algos)
                         logger.info { "Additional Option 2 clicked" }
@@ -291,55 +351,32 @@ fun app() {
                         additionalOptionsGroup2 = false
                         bridges.value = wgraph.findBridges()
                     }) {
-                        Text("Поиск мостов", color = colorStates[4])
+                        Text("Поиск мостов", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
-                    DropdownMenuItem(onClick = { // поиск циклов (Сделать!)
+                    DropdownMenuItem(onClick = { // поиск циклов (Сделать!) Сделал)))
                         logger.info { "Additional Option 3 clicked" }
                         expanded = false
                         additionalOptionsGroup2 = false
+                        isCyclesFromNode = true
+
                     }) {
-                        Text("Поиск циклов для заданной вершины", color = colorStates[4])
+                        Text("Поиск циклов для заданной вершины", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
-                }
-                DropdownMenuItem(onClick = {
-                    logger.info { "Option 3 clicked" }
-                    additionalOptionsGroup3 = true
-                    additionalOptionsGroup1 = false
-                    additionalOptionsGroup2 = false
-                }) {
-                    Text("Группа алгоритмов 2", color = colorStates[4])
-                }
-                if (additionalOptionsGroup3) {
-                    DropdownMenuItem(onClick = { // мин. остовное дерево (сделать!)
+                    DropdownMenuItem(onClick = { // мин. остовное дерево (сделать!) Это пусть тоже Олег делает
                         logger.info { "Additional Option 1 clicked" }
                         expanded = false
                         additionalOptionsGroup3 = false
                     }) {
-                        Text("Построение минимального остовного дерева", color = colorStates[4])
-                    }
-                    DropdownMenuItem(onClick = { // Дейкстра (работает вроде)
-                        logger.info { "Additional Option 2 clicked" }
-                        expanded = false
-                        isNodesToFindWayD.value = true
-                        additionalOptionsGroup3 = false
-                    }) {
-                        Text("Путь между вершинами (Дейкстра)", color = colorStates[4])
-                    }
-                    DropdownMenuItem(onClick = { // Форд-Беллман (вроде работает)
-                        logger.info { "Additional Option 3 clicked" }
-                        expanded = false
-                        isNodesToFindWay.value = true
-                        additionalOptionsGroup3 = false
-                    }) {
-                        Text("Путь между вершинами (Форд-Беллман)", color = colorStates[4])
+                        Text("Построение минимального остовного дерева", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
                 }
+
                 DropdownMenuItem(onClick = { // просто открывается маленькое меню настроек (там смена темы и сохранение)
                     logger.info { "settings" }
                     expanded = false
                     openSettings = true
                 }) {
-                    Text("settings", color = colorStates[4])
+                    Text("Параметры", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                 }
 
             }
@@ -349,20 +386,21 @@ fun app() {
                 colors = RadioButtonDefaults.colors(
                     unselectedColor = colorStates[4], // Цвет неактивного радиобаттона
                     selectedColor = Color.Cyan // Цвет активного радиобаттона
-                )
+                ) ,
+                //modifier = Modifier.size(50.dp * scaleFactor)
             )
-            Text("Создать узлы", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4])
+            Text("Создать узлы", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4], fontSize = 12.sp * scaleFactor)
 
             RadioButton(
                 selected = selectedOption == 2, // соединение
                 onClick = { selectedOption = 2 },
                 colors = RadioButtonDefaults.colors(
                     unselectedColor = colorStates[4], // Цвет неактивного радиобаттона
-                    selectedColor = Color.Cyan // Цвет активного радиобаттона
+                    selectedColor = Color.Magenta // Цвет активного радиобаттона
                 )
 
             )
-            Text("Соединить узлы", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4])
+            Text("Соединить узлы", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4], fontSize = 12.sp * scaleFactor)
 
             RadioButton( // это редактирование узлов
                 selected = selectedOption == 4,
@@ -372,15 +410,21 @@ fun app() {
                     selectedColor = Color.Cyan // Цвет активного радиобаттона
                 )
             )
-            Text("Редактировать", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4])
+            Text("Редактировать", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4], fontSize = 12.sp * scaleFactor)
 
             IconButton(onClick = { // Отмена
                 turnBack = true
             }) {
+
+                val imageResource = if (iconStates) {
+                    painterResource("img/nazad(Black).png")
+                } else
+                    painterResource("img/nazad(White).png")
+
                 Image(
-                    painter = painterResource("img/back.png"), // Замените на путь к вашему изображению
+                    painter = imageResource, // Замените на путь к вашему изображению
                     contentDescription = "Back",
-                    modifier = Modifier.size(32.dp) // Размер изображения
+                    modifier = Modifier.size(30.dp * scaleFactor) // Размер изображения
                 )
             }
             if (turnBack) { // здесь откат происходит с помощью хранения действий в стеке
@@ -473,9 +517,16 @@ fun app() {
                     openSettings = false
                     bridges.value = listOf()
                     isColorsForBeetweenes = false
+                    cyclesFromNode.value = listOf()
                     shortestWay.value = listOf()
+                    val hitCircle = findInMap(circlesToDraw, circleRadius, offset)
+                    if (hitCircle != null && isCyclesFromNode){
+                        cyclesFromNode.value = wgraph.findCyclesFromNode(hitCircle)
+                        logger.info {cyclesFromNode}
+                    }
+                    else
+                        isCyclesFromNode = false
                     if (isNodesToFindWay.value || isNodesToFindWayD.value) {
-                        val hitCircle = findInMap(circlesToDraw, circleRadius, offset)
                         if (hitCircle != null) {
                             if (startConnectingPoint == null) {
                                 startConnectingPoint = hitCircle
@@ -507,15 +558,21 @@ fun app() {
                     } else {
                         when (selectedOption) {
                             1 -> {
+                                sccsFlag = false
+                                isNodesClustering = false
                                 actionStack.add(Action(1, nodeCounter))
                                 circlesToDraw = circlesToDraw.toMutableMap()
                                     .apply { this[nodeCounter] = Pair(offset.x.toDp(), offset.y.toDp()) }
                                 logger.info { offset }
                                 wgraph.addNode(nodeCounter)
                                 nodeCounter += 1
+
                             }
 
                             2 -> {
+                                sccsFlag = false
+                                isNodesClustering = false
+
                                 val hitCircle = findInMap(circlesToDraw, circleRadius, offset)
                                 if (hitCircle != null) {
                                     if (startConnectingPoint == null) {
@@ -637,12 +694,24 @@ fun app() {
             })
         {
             val shortway = makeLineKeysFromList(shortestWay.value)
+
             Canvas(modifier = Modifier.align(Alignment.TopStart)) { // тут начинается отрисовка всего непотребства на экране
                 val canvasWidth = size.width
                 val canvasHeight = size.height
                 // Отрисовка линий
+                val allPairs = cyclesFromNode.value.flatMap { cycle ->
+                    val pairs = cycle.zipWithNext().map { (a, b) -> Pair(a, b) }
+                    if (cycle.size > 1) {
+                        pairs + Pair(cycle.last(), cycle.first())
+                    } else {
+                        pairs
+                    }
+                }
                 for ((key, value) in linesToDraw) {
                     var col = colorStates[4]
+                    if (key in allPairs || Pair(key.second, key.first) in allPairs){
+                        col = Color.Magenta
+                    }
                     if (Pair(key.first, key.second) in bridges.value || Pair(key.second, key.first) in bridges.value) {
                         col = Color.Magenta
                     }
@@ -664,13 +733,24 @@ fun app() {
                 }
 
                 // Отрисовка кругов
+                val uniqueVertices = cyclesFromNode.value.flatten().toSet()
                 for ((key, value) in circlesToDraw) {
                     var col = colorStates[1]
-                    if (isColorsForBeetweenes) {
-                        if (key in colorsForBeetweenes && !colorsForBeetweenes[key]!!.isNaN()) {
-                            col = Color(red = min((127F + 255 * colorsForBeetweenes[key]!! / 2).toInt(), 255), 0, 0)
+                    if (isNodesClustering){
+                        val maxValue = nodesInClusters.values.maxOf { it }
+                        val onePartValue = maxValue / 200
+                        col = Color(red = min((75F + nodesInClusters[key]!! / onePartValue).toInt(), 255),
+                            min((10F + nodesInClusters[key]!! / onePartValue).toInt(), 255),
+                            min((10F + nodesInClusters[key]!! / onePartValue).toInt(), 255))
+                    }
+                    if (isCyclesFromNode && cyclesFromNode.value.isNotEmpty()){
+                        if (key in uniqueVertices){
+                            col = Color.Blue
                         }
-                    } else if (shortestWay.value.isNotEmpty() && (key == shortestWay.value.first() || key == shortestWay.value.last())) {
+                        if (key == cyclesFromNode.value.first()[0])
+                            col = Color.Cyan
+                    }
+                    else if (shortestWay.value.isNotEmpty() && (key == shortestWay.value.first() || key == shortestWay.value.last())) {
                         col = Color.Cyan
                     } else if (key in shortestWay.value) {
                         col = Color.Blue
@@ -686,16 +766,37 @@ fun app() {
                         drawCircle(
                             color = colorStates[2],
                             radius = circleRadius.value + 1,
-                            center = Offset(value.first.value - canvasWidth / 2, value.second.value - canvasHeight / 2),
+                            center = Offset(
+                                value.first.value - canvasWidth / 2,
+                                value.second.value - canvasHeight / 2),
                             style = Stroke(width = 2.dp.toPx())
                         )
                     } // если придумаешь как делать текст на кружочках будешь крутым (я не смог)
                     //drawText(
                     //    textLayoutResult = TextLayoutResult(layoutInput=(),)
                     //)
-                }
 
+                }
+                if (sccsFlag){
+                    sccs.keys.forEach { scc ->
+                        val rColor= sccs[scc]!!
+                        scc.forEach { node ->
+                            val position = circlesToDraw[node]!!
+                            drawCircle(
+                                color = rColor,
+                                radius = circleRadius.value + 1,
+                                center = Offset(
+                                    position.first.value - canvasWidth / 2,
+                                    position.second.value - canvasHeight / 2
+                                ),
+                                style = Fill
+                            )
+                        }
+                    }
+                }
             }
+            cyclesFromNode.value = listOf()
+            //nodesInClusters = mapOf()
 
 // Отображаем всплывающее окно, если круг выбран
             selectedCircle?.let { key ->
@@ -759,10 +860,10 @@ fun app() {
                     contentAlignment = Alignment.Center
                 ) {
                     Column {
-                        Text("This is a settings", color = colorStates[4])
+                        Text("Выбрать тему", color = colorStates[4])
                         Spacer(modifier = Modifier.height(16.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Dark theme:", color = colorStates[4])
+                            Text("Тёмная тема:", color = colorStates[4])
                             Spacer(modifier = Modifier.width(8.dp))
                             Switch(
                                 checked = switchState,
@@ -792,7 +893,7 @@ fun app() {
                                 nodeCounter)
                             openSettings = false
                         }){
-                            Text("Save graph")
+                            Text("Сохранить граф")
                         }
                     }
                 }
@@ -810,10 +911,10 @@ fun mainScreen(onStartClick: () -> Unit) { // стартовое окно с з�
         verticalArrangement = Arrangement.Center
     ) {
         Button(onClick = onStartClick) {
-            Text("Start")
+            Text("Построить граф")
         }
         Button(onClick = { /* Handle other button click */ }) {
-            Text("Load save")
+            Text("Загрузить сохранение")
         }
 
     }
