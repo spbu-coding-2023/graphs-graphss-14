@@ -7,7 +7,7 @@ Welcome to our Kotlin application, a comprehensive toolkit designed to facilitat
 - **Graph Plane Layout (Spring Embedder):** Efficiently arrange graph nodes for optimal visualization.
 - **Highlighting Key Vertices:** Easily identify and emphasize critical nodes within the graph.
 - **Search for Communities (Clustering):** Discover and group nodes into communities based on their connectivity.
-- **Isolation of Strongly Connected Components:** Identify and isolate subgraphs where every node is reachable from every other node.
+- **Isolation of Strongly Connected Components (Kosarayu algorithm):** Identify and isolate subgraphs where every node is reachable from every other node.
 - **Finding Bridges:** Locate and highlight the edges that, when removed, would increase the number of disconnected components.
 - **Search for Cycles for a Given Vertex:** Trace and visualize cycles originating from a specified vertex.
 - **Constructing a Minimal Spanning Tree (SpanningTree STP):** Build a tree that spans all vertices with the minimum total edge weight.
@@ -18,8 +18,7 @@ Welcome to our Kotlin application, a comprehensive toolkit designed to facilitat
 
 Please be aware that the following features are currently unavailable and have not been integrated into the current version of the application:
 
-- **Search for Cycles for a Given Vertex**
 - **Search for Communities (Clustering)**
-- **Identification of Strong Connectivity Components**
+- **Constructing a Minimal Spanning Tree (SpanningTree STP)**
 
 We are actively working on these features and plan to include them in future updates.
