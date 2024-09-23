@@ -180,7 +180,7 @@ open class Graph {
 
         return betweenness
     }
-    fun findCyclesFromNode(node: Int): List<List<Int>> {
+    fun findCyclesFromNode(node: Int): List<List<Int>> { // МАТАВЭЙ а почему пол алгоритма от твоего имени???
         val cycles = mutableListOf<List<Int>>()
         val visited = mutableSetOf<Int>()
         val path = mutableListOf<Int>()

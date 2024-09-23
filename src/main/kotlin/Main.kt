@@ -1,6 +1,8 @@
+import algos.DiGraph
 import mu.KotlinLogging
 import algos.Graph
 import algos.WGraph
+import algos.findSCCs
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -127,6 +129,7 @@ fun app() {
     val shortestWay = remember { mutableStateOf(listOf<Int>()) }
     val cyclesFromNode  = remember { mutableStateOf(listOf<List<Int>>()) }
     var isCyclesFromNode  by remember { mutableStateOf(false) }
+    var isNodesClustering  by remember { mutableStateOf(false) }
     var nodesInClusters by remember { mutableStateOf(mapOf<Int, Float>()) }
 
     var selectedCircle by remember { mutableStateOf<Int?>(null) }
@@ -141,9 +144,12 @@ fun app() {
     var additionalOptionsGroup3 by remember { mutableStateOf(false) }
     var openSettings by remember { mutableStateOf(false) }
     var isColorsForBeetweenes by remember { mutableStateOf(false) }
+    var sccs by remember {mutableStateOf(mapOf<List<Int>, Color>())}
     var switchState by remember { mutableStateOf(false) }
     var turnBack by remember { mutableStateOf(false) }
     var iconStates by remember { mutableStateOf( false) }
+    var sccsFlag by remember { mutableStateOf( false) }
+    val scaleFactor = windowHeight / 600.dp
     val colorStates by remember { // цвет темы
         mutableStateOf(
             mutableListOf(
@@ -155,7 +161,24 @@ fun app() {
             )
         )
     }
+fun findSCCsInGraph()  :  Map<List<Int>, Color>{
+    val diGraph = DiGraph()
+    circlesToDraw.keys.forEach { diGraph.addNode(it) }
+    linesToDraw.keys.forEach { diGraph.addEdge(it.first, it.second) }
+    linesToDraw.keys.forEach { diGraph.addEdge(it.second, it.first) }
 
+    logger.info { "Nodes: ${diGraph.nodes}" }
+    logger.info { "Edges: ${diGraph.edges}" }
+
+    val sccst = findSCCs(diGraph).filter{it.size > 1}.sortedBy { it.size }.associateWith { Color(
+            Random.nextInt(50, 200),
+            Random.nextInt(50, 200),
+            Random.nextInt(50, 200)
+        )}
+
+    logger.info {"SCCs: ${sccst.keys}"}
+    return sccst
+}
     /*
 
     val firstImage = if (switchState) painterResource(image1) else painterResource(imageBlack)
@@ -212,7 +235,7 @@ fun app() {
                 Image( // Кортинка
                     painter = imageResource,
                     contentDescription = "Параметры",
-                    modifier = Modifier.size(30.dp) // Размер изображения
+                    modifier = Modifier.size(30.dp * scaleFactor) // Размер изображения
                 )
             } // конец кнопки настроек
 
@@ -220,9 +243,9 @@ fun app() {
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
                 modifier = Modifier.background(colorStates[0]).padding(1.dp).waterfallPadding().shadow(
-                    elevation = 4.dp,
+                    elevation = 8.dp,
                     spotColor = colorStates[4],
-                    ambientColor = colorStates[0]
+                    ambientColor = colorStates[0],
                 )
 
             ) {
@@ -232,7 +255,7 @@ fun app() {
                     additionalOptionsGroup2 = false
                     additionalOptionsGroup3 = false
                 }) {
-                    Text("Работающие алгоритмы", color = colorStates[4])
+                    Text("Работающие алгоритмы", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                 }
                 if (additionalOptionsGroup1) {
                     DropdownMenuItem(onClick = {
@@ -241,7 +264,7 @@ fun app() {
                         isNodesToFindWayD.value = true
                         additionalOptionsGroup1 = false
                     }){
-                        Text("Дейкстра", color = colorStates[4])
+                        Text("Дейкстра", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
                     DropdownMenuItem(onClick = {
                         logger.info { "Addtional Option" }
@@ -249,7 +272,7 @@ fun app() {
                         isNodesToFindWay.value = true
                         additionalOptionsGroup1 = false
                     }) {
-                        Text("Форд-Беллман", color = colorStates[4])
+                        Text("Форд-Беллман", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
                     DropdownMenuItem(onClick = {
                         // случайная раскладка графа на плоскости
@@ -265,15 +288,15 @@ fun app() {
                         expanded = false
                         additionalOptionsGroup1 = false
                     }) {
-                        Text("Разложить граф случайно", color = colorStates[4])
+                        Text("Разложить граф случайно", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
                     DropdownMenuItem(onClick = {
                         val qwerty = Graph.SpringEmbedder().layout(wgraph)
                         //раскладка графа алгоритмом от Руслана
                         circlesToDraw.forEach { (key, _) ->
                             circlesToDraw[key] = Pair(
-                                Dp(qwerty[key]!!.first.toFloat() * windowWidth.value / 20 + windowWidth.value / 2),
-                                Dp(qwerty[key]!!.second.toFloat() * windowHeight.value / 20 + windowHeight.value / 2)
+                                Dp(qwerty[key]!!.first.toFloat() * windowWidth.value / 30 + windowWidth.value / 2),
+                                Dp(qwerty[key]!!.second.toFloat() * windowHeight.value / 30 + windowHeight.value / 2)
                             )
                         }
                         linesToDraw.forEach { (key, _) ->
@@ -282,7 +305,7 @@ fun app() {
                         expanded = false
                         additionalOptionsGroup1 = false
                     }) {// название поменять, на название алгоритма
-                        Text("Разложить граф случайно по умному", color = colorStates[4])
+                        Text("Spring Embedder (Раскладка графа)", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
                     DropdownMenuItem(onClick = {
                         logger.info { "Additional Option 2 clicked" }
@@ -293,7 +316,7 @@ fun app() {
                         expanded = false
                         additionalOptionsGroup1 = false
                     }) {
-                        Text("Ключевые вершины", color = colorStates[4])
+                        Text("Выделение сообществ", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
                 }
                 DropdownMenuItem(onClick = {
@@ -302,27 +325,25 @@ fun app() {
                     additionalOptionsGroup1 = false
                     additionalOptionsGroup3 = false
                 }) {
-                    Text("Группа нерабочих", color = colorStates[4])
+                    Text("Группа нерабочих", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                 }
                 if (additionalOptionsGroup2) {
-                    DropdownMenuItem(onClick = {// выделение компоненты сильной связности (Сделать!)
+                    DropdownMenuItem(onClick = {// выделение компоненты сильной связности (Сделать!) //Сделал)))
                         logger.info { "Additional Option 1 clicked" }
                         expanded = false
                         additionalOptionsGroup2 = false
-                    }) {
-                        Text("Выделение компонент сильной связности", color = colorStates[4])
+                        sccs = findSCCsInGraph()
+                        sccsFlag = true }) {
+                        Text("Выделение компонент сильной связности", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
-                    DropdownMenuItem(onClick = { //выделение сообществ (его нет, сделать)
+                    DropdownMenuItem(onClick = { //выделение сообществ (его нет, сделать). А это пусть Олег делает... если сделает...
                         logger.info { "Additional Option 3 clicked" }
                         expanded = false
                         nodesInClusters = wgraph.betweennessCentrality()
+                        isNodesClustering = true
                         logger.info { nodesInClusters }
-                        //colorsForClusters = Graph.ClusteredGraph.
-//                        //graph.clusterGraph()
-//                        //graph.colorClusters()
-                        //additionalOptionsGroup1 = false
                     }) {
-                        Text("Выделение сообществ", color = colorStates[4])
+                        Text("Ключевые вершины", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
                     DropdownMenuItem(onClick = { //  поиск мостов (как работают - смотреть в /algos)
                         logger.info { "Additional Option 2 clicked" }
@@ -330,33 +351,32 @@ fun app() {
                         additionalOptionsGroup2 = false
                         bridges.value = wgraph.findBridges()
                     }) {
-                        Text("Поиск мостов", color = colorStates[4])
+                        Text("Поиск мостов", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
-                    DropdownMenuItem(onClick = { // поиск циклов (Сделать!)
+                    DropdownMenuItem(onClick = { // поиск циклов (Сделать!) Сделал)))
                         logger.info { "Additional Option 3 clicked" }
                         expanded = false
                         additionalOptionsGroup2 = false
                         isCyclesFromNode = true
 
                     }) {
-                        Text("Поиск циклов для заданной вершины", color = colorStates[4])
+                        Text("Поиск циклов для заданной вершины", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
-                }
-                if (additionalOptionsGroup3) {
-                    DropdownMenuItem(onClick = { // мин. остовное дерево (сделать!)
+                    DropdownMenuItem(onClick = { // мин. остовное дерево (сделать!) Это пусть тоже Олег делает
                         logger.info { "Additional Option 1 clicked" }
                         expanded = false
                         additionalOptionsGroup3 = false
                     }) {
-                        Text("Построение минимального остовного дерева", color = colorStates[4])
+                        Text("Построение минимального остовного дерева", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
                 }
+
                 DropdownMenuItem(onClick = { // просто открывается маленькое меню настроек (там смена темы и сохранение)
                     logger.info { "settings" }
                     expanded = false
                     openSettings = true
                 }) {
-                    Text("Параметры", color = colorStates[4])
+                    Text("Параметры", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                 }
 
             }
@@ -366,20 +386,21 @@ fun app() {
                 colors = RadioButtonDefaults.colors(
                     unselectedColor = colorStates[4], // Цвет неактивного радиобаттона
                     selectedColor = Color.Cyan // Цвет активного радиобаттона
-                )
+                ) ,
+                //modifier = Modifier.size(50.dp * scaleFactor)
             )
-            Text("Создать узлы", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4])
+            Text("Создать узлы", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4], fontSize = 12.sp * scaleFactor)
 
             RadioButton(
                 selected = selectedOption == 2, // соединение
                 onClick = { selectedOption = 2 },
                 colors = RadioButtonDefaults.colors(
                     unselectedColor = colorStates[4], // Цвет неактивного радиобаттона
-                    selectedColor = Color.Cyan // Цвет активного радиобаттона
+                    selectedColor = Color.Magenta // Цвет активного радиобаттона
                 )
 
             )
-            Text("Соединить узлы", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4])
+            Text("Соединить узлы", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4], fontSize = 12.sp * scaleFactor)
 
             RadioButton( // это редактирование узлов
                 selected = selectedOption == 4,
@@ -389,7 +410,7 @@ fun app() {
                     selectedColor = Color.Cyan // Цвет активного радиобаттона
                 )
             )
-            Text("Редактировать", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4])
+            Text("Редактировать", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4], fontSize = 12.sp * scaleFactor)
 
             IconButton(onClick = { // Отмена
                 turnBack = true
@@ -403,7 +424,7 @@ fun app() {
                 Image(
                     painter = imageResource, // Замените на путь к вашему изображению
                     contentDescription = "Back",
-                    modifier = Modifier.size(30.dp) // Размер изображения
+                    modifier = Modifier.size(30.dp * scaleFactor) // Размер изображения
                 )
             }
             if (turnBack) { // здесь откат происходит с помощью хранения действий в стеке
@@ -537,15 +558,21 @@ fun app() {
                     } else {
                         when (selectedOption) {
                             1 -> {
+                                sccsFlag = false
+                                isNodesClustering = false
                                 actionStack.add(Action(1, nodeCounter))
                                 circlesToDraw = circlesToDraw.toMutableMap()
                                     .apply { this[nodeCounter] = Pair(offset.x.toDp(), offset.y.toDp()) }
                                 logger.info { offset }
                                 wgraph.addNode(nodeCounter)
                                 nodeCounter += 1
+
                             }
 
                             2 -> {
+                                sccsFlag = false
+                                isNodesClustering = false
+
                                 val hitCircle = findInMap(circlesToDraw, circleRadius, offset)
                                 if (hitCircle != null) {
                                     if (startConnectingPoint == null) {
@@ -709,6 +736,13 @@ fun app() {
                 val uniqueVertices = cyclesFromNode.value.flatten().toSet()
                 for ((key, value) in circlesToDraw) {
                     var col = colorStates[1]
+                    if (isNodesClustering){
+                        val maxValue = nodesInClusters.values.maxOf { it }
+                        val onePartValue = maxValue / 200
+                        col = Color(red = min((75F + nodesInClusters[key]!! / onePartValue).toInt(), 255),
+                            min((10F + nodesInClusters[key]!! / onePartValue).toInt(), 255),
+                            min((10F + nodesInClusters[key]!! / onePartValue).toInt(), 255))
+                    }
                     if (isCyclesFromNode && cyclesFromNode.value.isNotEmpty()){
                         if (key in uniqueVertices){
                             col = Color.Blue
@@ -716,11 +750,7 @@ fun app() {
                         if (key == cyclesFromNode.value.first()[0])
                             col = Color.Cyan
                     }
-                    if (isColorsForBeetweenes) {
-                        if (key in colorsForBeetweenes && !colorsForBeetweenes[key]!!.isNaN()) {
-                            col = Color(red = min((127F + 255 * colorsForBeetweenes[key]!! / 2).toInt(), 255), 0, 0)
-                        }
-                    } else if (shortestWay.value.isNotEmpty() && (key == shortestWay.value.first() || key == shortestWay.value.last())) {
+                    else if (shortestWay.value.isNotEmpty() && (key == shortestWay.value.first() || key == shortestWay.value.last())) {
                         col = Color.Cyan
                     } else if (key in shortestWay.value) {
                         col = Color.Blue
@@ -736,17 +766,37 @@ fun app() {
                         drawCircle(
                             color = colorStates[2],
                             radius = circleRadius.value + 1,
-                            center = Offset(value.first.value - canvasWidth / 2, value.second.value - canvasHeight / 2),
+                            center = Offset(
+                                value.first.value - canvasWidth / 2,
+                                value.second.value - canvasHeight / 2),
                             style = Stroke(width = 2.dp.toPx())
                         )
                     } // если придумаешь как делать текст на кружочках будешь крутым (я не смог)
                     //drawText(
                     //    textLayoutResult = TextLayoutResult(layoutInput=(),)
                     //)
-                }
 
+                }
+                if (sccsFlag){
+                    sccs.keys.forEach { scc ->
+                        val rColor= sccs[scc]!!
+                        scc.forEach { node ->
+                            val position = circlesToDraw[node]!!
+                            drawCircle(
+                                color = rColor,
+                                radius = circleRadius.value + 1,
+                                center = Offset(
+                                    position.first.value - canvasWidth / 2,
+                                    position.second.value - canvasHeight / 2
+                                ),
+                                style = Fill
+                            )
+                        }
+                    }
+                }
             }
             cyclesFromNode.value = listOf()
+            //nodesInClusters = mapOf()
 
 // Отображаем всплывающее окно, если круг выбран
             selectedCircle?.let { key ->
