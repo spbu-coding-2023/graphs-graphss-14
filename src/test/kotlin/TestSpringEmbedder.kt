@@ -2,10 +2,9 @@ import algos.Graph
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class SpringEmbedderTest {
+class TestSpringEmbedder {
 
     @Test
     fun `test layout for a simple graph`() {
