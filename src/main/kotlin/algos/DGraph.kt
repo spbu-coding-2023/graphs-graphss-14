@@ -97,8 +97,10 @@ override fun findBridges(): List<Pair<Int, Int>> {
         for (node in nodes) {
             transposedGraph.addNode(node)
         }
-        for ((u, v) in edges) {
-            transposedGraph.addEdge(v, u)
+        for ((from, neighbors) in adjacencyList) {
+            for (to in neighbors) {
+                transposedGraph.addEdge(to, from, 1)
+            }
         }
         return transposedGraph
     }
