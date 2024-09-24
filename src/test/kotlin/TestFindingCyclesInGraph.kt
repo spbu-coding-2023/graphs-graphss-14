@@ -51,7 +51,7 @@ class TestFindingCyclesInGraph {
         graph.addEdge(2, 3)
         graph.addEdge(3, 4)
 
-        val cycles = graph.findCyclesFromNode(1)
+        val cycles = graph.findCyclesFromNode(1 )
         assertEquals(1, cycles.filter { it[0] == 1 }.size)
     }
 

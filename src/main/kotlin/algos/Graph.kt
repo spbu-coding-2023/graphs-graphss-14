@@ -21,6 +21,7 @@ open class Graph {
             adjacencyList[m]?.add(n)
         }
     }
+
     fun removeNode(n: Int) {
         nodes.remove(n)
         adjacencyList.remove(n)
@@ -29,13 +30,15 @@ open class Graph {
             neighbors.remove(n)
         }
     }
-    fun removeEdge(n:Int, m:Int){
-        edges.remove(Pair(n,m))
-        edges.remove(Pair(m,n))
+
+    fun removeEdge(n: Int, m: Int) {
+        edges.remove(Pair(n, m))
+        edges.remove(Pair(m, n))
         adjacencyList[n]?.remove(m)
         adjacencyList[m]?.remove(n)
     }
-    fun findBridges(): List<Pair<Int, Int>> {
+
+    open fun findBridges(): List<Pair<Int, Int>> {
         val bridges = mutableListOf<Pair<Int, Int>>()
         val visited = mutableSetOf<Int>()
         val discoveryTime = mutableMapOf<Int, Int>()
@@ -69,10 +72,6 @@ open class Graph {
 
         return bridges
     }
-    fun printAll(){
-        println(nodes)
-        println(edges)
-    }
 
     open class SpringEmbedder {
         private val smoothingFactor = 0.1
@@ -100,7 +99,8 @@ open class Graph {
                         val deltaY = layout[node]!!.second - layout[neighbor]!!.second
                         val distance = sqrt(deltaX * deltaX + deltaY * deltaY)
                         val repulsion = smoothingFactor * smoothingFactor / distance // Сила отталкивания
-                        forces[node] = Pair(forces[node]!!.first + repulsion * deltaX, forces[node]!!.second + repulsion * deltaY)
+                        forces[node] =
+                            Pair(forces[node]!!.first + repulsion * deltaX, forces[node]!!.second + repulsion * deltaY)
                     }
                 }
 
@@ -158,7 +158,9 @@ open class Graph {
             while (stack.isNotEmpty()) {
                 val w = stack.removeLast()
                 for (v in predecessors[w] ?: emptyList()) {
-                    dependency[v] = dependency.getOrDefault(v, 0.0F) + (sigma.getOrDefault(v, 0) / sigma.getOrDefault(w, 1).toFloat()) * (1 + dependency.getOrDefault(w, 0.0F))
+                    dependency[v] =
+                        dependency.getOrDefault(v, 0.0F) + (sigma.getOrDefault(v, 0) / sigma.getOrDefault(w, 1)
+                            .toFloat()) * (1 + dependency.getOrDefault(w, 0.0F))
                 }
                 if (w != source) {
                     betweenness[w] = betweenness.getOrDefault(w, 0.0F) + dependency.getOrDefault(w, 0.0F)
@@ -180,7 +182,8 @@ open class Graph {
 
         return betweenness
     }
-    fun findCyclesFromNode(node: Int): List<List<Int>> { // МАТАВЭЙ а почему пол алгоритма от твоего имени???
+
+    open fun findCyclesFromNode(node: Int): List<List<Int>> {
         val cycles = mutableListOf<List<Int>>()
         val visited = mutableSetOf<Int>()
         val path = mutableListOf<Int>()
@@ -206,22 +209,7 @@ open class Graph {
 
         dfs(node)
 
-        return cycles
-    }
-}
-fun main(){
-    val graph = Graph()
-    graph.addNode(1)
-    graph.addNode(2)
-    graph.addNode(3)
-    graph.addNode(4)
-    graph.addEdge(1, 2)
-    graph.addEdge(2, 3)
-    graph.addEdge(3, 1) // Создаем цикл 1 -> 2 -> 3 -> 1
-    graph.addEdge(3, 4)
-    graph.addEdge(2, 4)
-    graph.addEdge(4, 1)
-    graph.addEdge(4, 2) // Создаем цикл 2 -> 3 -> 4 -> 2
+        return cycles.filter { it.size > 2 }
 
-    println(graph.findCyclesFromNode(1))
+    }
 }

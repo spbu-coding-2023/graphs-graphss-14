@@ -2,7 +2,6 @@ import algos.DiGraph
 import mu.KotlinLogging
 import algos.Graph
 import algos.WGraph
-import algos.findSCCs
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -34,14 +33,64 @@ import kotlin.math.sqrt
 import kotlin.random.Random
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import kotlin.math.min
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import java.io.File
+import java.awt.FileDialog
+import java.awt.Frame
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+
+fun DrawScope.drawArrow(color: Color, start: Offset, end: Offset, n: Dp) {
+    val arrowHeadSize = 10.dp.toPx()
+    val angle = Math.atan2((end.y - start.y).toDouble(), (end.x - start.x).toDouble())
+
+    // Преобразуем n в пиксели
+    val nPx = n.toPx()
+
+    // Вычисляем новую конечную точку с учетом отступа n
+    val newEnd = Offset(
+        (end.x - nPx * Math.cos(angle)).toFloat(),
+        (end.y - nPx * Math.sin(angle)).toFloat()
+    )
+
+    drawLine(
+        color = color,
+        start = start,
+        end = newEnd,
+        strokeWidth = 2.dp.toPx()
+    )
+
+    val arrowHead1 = Offset(
+        (newEnd.x - arrowHeadSize * Math.cos(angle - Math.PI / 6)).toFloat(),
+        (newEnd.y - arrowHeadSize * Math.sin(angle - Math.PI / 6)).toFloat()
+    )
+    val arrowHead2 = Offset(
+        (newEnd.x - arrowHeadSize * Math.cos(angle + Math.PI / 6)).toFloat(),
+        (newEnd.y - arrowHeadSize * Math.sin(angle + Math.PI / 6)).toFloat()
+    )
+
+    drawLine(
+        color = color,
+        start = newEnd,
+        end = arrowHead1,
+        strokeWidth = 2.dp.toPx()
+    )
+    drawLine(
+        color = color,
+        start = newEnd,
+        end = arrowHead2,
+        strokeWidth = 2.dp.toPx()
+    )
+}
+
+fun Float.toDp(density: Density): Dp {
+    return with(density) { this@toDp.toDp() }
+}
 
 fun makeLineKeysFromList(nodes: List<Int>): List<Pair<Int, Int>> {
     return nodes.zipWithNext()
@@ -74,6 +123,7 @@ data class CircleData(
 //инфа про текущее состояние графа (для сохранения) (можно добавить еще какой-то инфы)
 @Serializable
 data class WindowStateData(
+    val graphMode : Boolean,
     val circlesToDraw: Map<Int,CircleData>,
     val linesToDraw: Map<Pair<Int, Int>, Pair<CircleData, CircleData>>,
     val switchState: Boolean,
@@ -82,12 +132,14 @@ data class WindowStateData(
 
 //ну собсна сохранение в формат .json
 fun saveToFile(
+    graphMode: Boolean,
     circlesToDraw: Map<Int, CircleData>,
     linesToDraw: Map<Pair<Int, Int>, Pair<CircleData, CircleData>>,
     switchState: Boolean,
-    nodeCounter: Int
+    nodeCounter: Int,
+    fileName : String?
 ) {
-    val data = WindowStateData( circlesToDraw, linesToDraw, switchState, nodeCounter)
+    val data = WindowStateData(graphMode, circlesToDraw, linesToDraw, switchState, nodeCounter)
     val json = Json{
         allowStructuredMapKeys = true
     }.
@@ -95,22 +147,60 @@ fun saveToFile(
     val directory = File("src/main/resources/save/")
     directory.mkdirs()
 
-    // Получаем текущее время
-    val currentTime = LocalDateTime.now()
-    // Форматируем время в строку
-    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
-    val formattedTime = currentTime.format(formatter)
+    if (fileName == null) {
+        // Получаем текущее время
+        val currentTime = LocalDateTime.now()
+        // Форматируем время в строку
+        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
+        val formattedTime = currentTime.format(formatter)
 
-    val fileName = "$formattedTime.json"
+        val newFileName = "$formattedTime.json"
+        val file = File(directory, newFileName)
+        file.writeText(json)
+    }
+    else{
+        val file = File(directory, fileName)
+        file.writeText(json)
+    }
+}
+
+fun chooseFile(initialDirectory: File): File? {
+    val fileDialog = FileDialog(Frame(), "Выберите файл", FileDialog.LOAD)
+    fileDialog.isMultipleMode = false
+    fileDialog.directory = initialDirectory.absolutePath
+    fileDialog.file = "*.json" // Фильтр для отображения только JSON файлов
+    fileDialog.isVisible = true
+
+    return if (fileDialog.file != null) {
+        File(fileDialog.directory, fileDialog.file)
+    } else {
+        null
+    }
+}
+
+fun loadFromFile(fileName: String): WindowStateData {
+    val directory = File("src/main/resources/save/")
     val file = File(directory, fileName)
-    file.writeText(json)
+
+    if (!file.exists()) {
+        throw IllegalArgumentException("File not found: $fileName")
+    }
+
+    val jsonContent = file.readText()
+    return Json {
+        allowStructuredMapKeys = true
+    }.decodeFromString(jsonContent)
 }
 //отладочная информация в консоль (вместо отладочных принтов)
 private val logger = KotlinLogging.logger {}
+
+
 //основной код
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun app() {
+fun app(savesData : WindowStateData, selectedFile: String?) {
+    val firstTime = remember { mutableStateOf(true) }
+    val saves by remember { mutableStateOf(savesData) }
     // Вся инфа которую нужно хранить
     val windowState = rememberWindowState()
     val density = LocalDensity.current
@@ -120,7 +210,7 @@ fun app() {
     var circlesToDraw by remember { mutableStateOf(mutableMapOf<Int, Pair<Dp, Dp>>()) }
     var colorsForBeetweenes by remember { mutableStateOf(mapOf<Int, Float>()) }
     var linesToDraw by remember { mutableStateOf(mutableMapOf<Pair<Int, Int>, Pair<Pair<Dp, Dp>, Pair<Dp, Dp>>>()) }
-    val wgraph = remember { WGraph() }
+    var graph by remember { mutableStateOf( WGraph()) }
 
 
     val bridges = remember { mutableStateOf(listOf<Pair<Int, Int>>()) }
@@ -150,6 +240,7 @@ fun app() {
     var iconStates by remember { mutableStateOf( false) }
     var sccsFlag by remember { mutableStateOf( false) }
     val scaleFactor = windowHeight / 600.dp
+    
     val colorStates by remember { // цвет темы
         mutableStateOf(
             mutableListOf(
@@ -161,31 +252,25 @@ fun app() {
             )
         )
     }
-fun findSCCsInGraph()  :  Map<List<Int>, Color>{
-    val diGraph = DiGraph()
-    circlesToDraw.keys.forEach { diGraph.addNode(it) }
-    linesToDraw.keys.forEach { diGraph.addEdge(it.first, it.second) }
-    linesToDraw.keys.forEach { diGraph.addEdge(it.second, it.first) }
+    fun findSCCsInGraph()  :  Map<List<Int>, Color>{
+        val diGraph = DiGraph()
+        circlesToDraw.keys.forEach { diGraph.addNode(it) }
+        linesToDraw.keys.forEach { diGraph.addEdge(it.first, it.second) }
+        linesToDraw.keys.forEach { diGraph.addEdge(it.second, it.first) }
 
-    logger.info { "Nodes: ${diGraph.nodes}" }
-    logger.info { "Edges: ${diGraph.edges}" }
+        logger.info { "Nodes: ${diGraph.nodes}" }
+        logger.info { "Edges: ${diGraph.edges}" }
 
-    val sccst = findSCCs(diGraph).filter{it.size > 1}.sortedBy { it.size }.associateWith { Color(
+        val sccst = diGraph.findSCCs().filter{it.size > 1}.sortedBy { it.size }.associateWith { Color(
             Random.nextInt(50, 200),
             Random.nextInt(50, 200),
             Random.nextInt(50, 200)
         )}
 
-    logger.info {"SCCs: ${sccst.keys}"}
-    return sccst
-}
-    /*
+        logger.info {"SCCs: ${sccst.keys}"}
+        return sccst
+    }
 
-    val firstImage = if (switchState) painterResource(image1) else painterResource(imageBlack)
-
-    Image(painter = firstImage)
-
-    */
     if (switchState) { // тут в зависимости от переключателя в настройках выбирается тема
         colorStates[0] = Color.Black
         colorStates[1] = Color.Red
@@ -207,6 +292,25 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
     var selectedOption by remember { mutableStateOf(1) }
     var nodeCounter by remember { mutableStateOf(0) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    
+    if (firstTime.value){
+        if(saves.graphMode) {
+            graph =  DiGraph()
+        }
+        switchState = saves.switchState
+        nodeCounter = saves.nodeCounter
+        saves.circlesToDraw.forEach { (key, data) ->
+            circlesToDraw[key] = Pair(data.x.toDp(density), data.y.toDp(density))
+            graph.addNode(key)
+        }
+        saves.linesToDraw.forEach{(key, data) ->
+            linesToDraw[key] = Pair(Pair(data.first.x.toDp(density), data.first.y.toDp(density)),
+                Pair(data.second.x.toDp(density), data.second.y.toDp(density)))
+            graph.addEdge(key.first, key.second, 1)
+
+        }
+        firstTime.value = false
+    }
     Column { // начало UI
         Row( // всякие модификаторы для того чтобы было красиво
             modifier = Modifier
@@ -255,7 +359,7 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                     additionalOptionsGroup2 = false
                     additionalOptionsGroup3 = false
                 }) {
-                    Text("Работающие алгоритмы", color = colorStates[4], fontSize = 12.sp * scaleFactor)
+                    Text("Первая группа алгоритмов", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                 }
                 if (additionalOptionsGroup1) {
                     DropdownMenuItem(onClick = {
@@ -291,7 +395,7 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                         Text("Разложить граф случайно", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
                     DropdownMenuItem(onClick = {
-                        val qwerty = Graph.SpringEmbedder().layout(wgraph)
+                        val qwerty = Graph.SpringEmbedder().layout(graph)
                         //раскладка графа алгоритмом от Руслана
                         circlesToDraw.forEach { (key, _) ->
                             circlesToDraw[key] = Pair(
@@ -309,14 +413,15 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                     }
                     DropdownMenuItem(onClick = {
                         logger.info { "Additional Option 2 clicked" }
-                        colorsForBeetweenes = wgraph.betweennessCentrality()
+                        colorsForBeetweenes = graph.betweennessCentrality()
                         logger.info { colorsForBeetweenes }
 
                         isColorsForBeetweenes = true
                         expanded = false
                         additionalOptionsGroup1 = false
+
                     }) {
-                        Text("Выделение сообществ", color = colorStates[4], fontSize = 12.sp * scaleFactor)
+                        Text("Выделение сообществ (не работает)", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
                 }
                 DropdownMenuItem(onClick = {
@@ -325,10 +430,10 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                     additionalOptionsGroup1 = false
                     additionalOptionsGroup3 = false
                 }) {
-                    Text("Группа нерабочих", color = colorStates[4], fontSize = 12.sp * scaleFactor)
+                    Text("Вторая группа алгоритмов", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                 }
                 if (additionalOptionsGroup2) {
-                    DropdownMenuItem(onClick = {// выделение компоненты сильной связности (Сделать!) //Сделал)))
+                    DropdownMenuItem(onClick = {// выделение компоненты сильной связности
                         logger.info { "Additional Option 1 clicked" }
                         expanded = false
                         additionalOptionsGroup2 = false
@@ -336,10 +441,10 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                         sccsFlag = true }) {
                         Text("Выделение компонент сильной связности", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
-                    DropdownMenuItem(onClick = { //выделение сообществ (его нет, сделать). А это пусть Олег делает... если сделает...
+                    DropdownMenuItem(onClick = { //выделение сообществ
                         logger.info { "Additional Option 3 clicked" }
                         expanded = false
-                        nodesInClusters = wgraph.betweennessCentrality()
+                        nodesInClusters = graph.betweennessCentrality()
                         isNodesClustering = true
                         logger.info { nodesInClusters }
                     }) {
@@ -349,7 +454,8 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                         logger.info { "Additional Option 2 clicked" }
                         expanded = false
                         additionalOptionsGroup2 = false
-                        bridges.value = wgraph.findBridges()
+                        bridges.value = graph.findBridges()
+                        selectedOption = 0
                     }) {
                         Text("Поиск мостов", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
@@ -358,6 +464,7 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                         expanded = false
                         additionalOptionsGroup2 = false
                         isCyclesFromNode = true
+                        selectedOption = 0
 
                     }) {
                         Text("Поиск циклов для заданной вершины", color = colorStates[4], fontSize = 12.sp * scaleFactor)
@@ -366,8 +473,9 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                         logger.info { "Additional Option 1 clicked" }
                         expanded = false
                         additionalOptionsGroup3 = false
+                        selectedOption = 0
                     }) {
-                        Text("Построение минимального остовного дерева", color = colorStates[4], fontSize = 12.sp * scaleFactor)
+                        Text("Построение минимального остовного дерева (не работает)", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
                 }
 
@@ -386,8 +494,7 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                 colors = RadioButtonDefaults.colors(
                     unselectedColor = colorStates[4], // Цвет неактивного радиобаттона
                     selectedColor = Color.Cyan // Цвет активного радиобаттона
-                ) ,
-                //modifier = Modifier.size(50.dp * scaleFactor)
+                )
             )
             Text("Создать узлы", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4], fontSize = 12.sp * scaleFactor)
 
@@ -436,23 +543,23 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                         1 -> { // в стеке действий код 1 значит создание узла (значит мы удаляем)
                             circlesToDraw.remove(lastAction.data as Int)
                             nodeCounter--
-                            wgraph.removeNode(lastAction.data)
+                            graph.removeNode(lastAction.data)
                         }
 
                         2 -> { // отмена линии
                             val (start, end) = lastAction.data as Pair<*, *>
                             linesToDraw.remove(Pair(start, end))
-                            wgraph.removeEdge(start as Int, end as Int)
+                            graph.removeEdge(start as Int, end as Int)
                         }
+
                         3 ->{ // отмена передвижения
                             val (key, pos,lines) = lastAction.data as Triple<Int,Pair<Dp,Dp>,List<Pair<Int,Int>>>
                             circlesToDraw[key] = pos
-                            wgraph.addNode(key)
+                            graph.addNode(key)
                             for (i in lines){
-                                wgraph.addEdge(i.first,i.second, 1)
+                                graph.addEdge(i.first,i.second, 1)
                                 linesToDraw[i] = Pair(circlesToDraw[i.first]!!, circlesToDraw[i.second]!!)
                             }
-
                         }
                     }
                 }
@@ -474,23 +581,23 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                             1 -> {
                                 circlesToDraw.remove(lastAction.data as Int)
                                 nodeCounter--
-                                wgraph.removeNode(lastAction.data)
+                                graph.removeNode(lastAction.data)
                             }
 
                             2 -> {
                                 val (start, end) = lastAction.data as Pair<*, *>
                                 linesToDraw.remove(Pair(start, end))
-                                wgraph.removeEdge(start as Int, end as Int)
+                                graph.removeEdge(start as Int, end as Int)
                             }
+
                             3 ->{
                                 val (key, pos,lines) = lastAction.data as Triple<Int,Pair<Dp,Dp>,List<Pair<Int,Int>>>
                                 circlesToDraw[key] = pos
-                                wgraph.addNode(key)
+                                graph.addNode(key)
                                 for (i in lines){
-                                    wgraph.addEdge(i.first,i.second, 1)
+                                    graph.addEdge(i.first,i.second, 1)
                                     linesToDraw[i] = Pair(circlesToDraw[i.first]!!, circlesToDraw[i.second]!!)
                                 }
-
                             }
                         }
                     }
@@ -517,12 +624,11 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                     openSettings = false
                     bridges.value = listOf()
                     isColorsForBeetweenes = false
-                    cyclesFromNode.value = listOf()
                     shortestWay.value = listOf()
                     val hitCircle = findInMap(circlesToDraw, circleRadius, offset)
                     if (hitCircle != null && isCyclesFromNode){
-                        cyclesFromNode.value = wgraph.findCyclesFromNode(hitCircle)
-                        logger.info {cyclesFromNode}
+                        cyclesFromNode.value = graph.findCyclesFromNode(hitCircle)
+                        logger.info {graph.findCyclesFromNode(hitCircle)}
                     }
                     else
                         isCyclesFromNode = false
@@ -533,9 +639,9 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                             } else if (endConnectingPoint == null && startConnectingPoint != hitCircle) {
                                 endConnectingPoint = hitCircle
                                 val temp: List<Int>? = if (isNodesToFindWayD.value) {
-                                    wgraph.shortestPathD(startConnectingPoint!!, endConnectingPoint!!)
+                                    graph.shortestPathD(startConnectingPoint!!, endConnectingPoint!!)
                                 } else {
-                                    wgraph.shortestPathBF(startConnectingPoint!!, endConnectingPoint!!)
+                                    graph.shortestPathBF(startConnectingPoint!!, endConnectingPoint!!)
                                 }
                                 if (temp != null) {
                                     shortestWay.value = temp
@@ -564,7 +670,7 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                                 circlesToDraw = circlesToDraw.toMutableMap()
                                     .apply { this[nodeCounter] = Pair(offset.x.toDp(), offset.y.toDp()) }
                                 logger.info { offset }
-                                wgraph.addNode(nodeCounter)
+                                graph.addNode(nodeCounter)
                                 nodeCounter += 1
 
                             }
@@ -579,7 +685,7 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                                         startConnectingPoint = hitCircle
                                     } else if (endConnectingPoint == null && startConnectingPoint != hitCircle) {
                                         endConnectingPoint = hitCircle
-                                        if (!(Pair(endConnectingPoint, startConnectingPoint) in linesToDraw || Pair(
+                                        if ((!(Pair(endConnectingPoint, startConnectingPoint) in linesToDraw && !saves.graphMode)|| Pair(
                                                 startConnectingPoint,
                                                 endConnectingPoint
                                             ) in linesToDraw)
@@ -597,7 +703,8 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                                                         circlesToDraw[endConnectingPoint]!!
                                                     )
                                             }
-                                            wgraph.addEdge(startConnectingPoint!!, endConnectingPoint!!, 1)
+                                            graph.addEdge(startConnectingPoint!!,endConnectingPoint!!, 1)
+
                                         }
                                         startConnectingPoint = null
                                         endConnectingPoint = null
@@ -608,18 +715,14 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                                 }
                             }
 
-
                             4 -> {
                                 selectedCircle = findInMap(circlesToDraw, circleRadius, offset)
                             }
-
-//                        3 -> {
-//                            selectedCircleToMove = findInMap(circles, circleRadius, offset)
-//                        }
                         }
                     }
                 })
-            }.onSizeChanged { newSize -> // обработка изменения размеров приложения
+            }
+                .onSizeChanged { newSize -> // обработка изменения размеров приложения
                 val temp = with(density) { DpSize(newSize.width.toDp(), newSize.height.toDp()) }
                 if (temp != windowSize) {
                     windowSize = temp
@@ -699,7 +802,7 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                 val canvasWidth = size.width
                 val canvasHeight = size.height
                 // Отрисовка линий
-                val allPairs = cyclesFromNode.value.flatMap { cycle ->
+                val allPairs = cyclesFromNode.value.toMutableList().flatMap { cycle ->
                     val pairs = cycle.zipWithNext().map { (a, b) -> Pair(a, b) }
                     if (cycle.size > 1) {
                         pairs + Pair(cycle.last(), cycle.first())
@@ -718,6 +821,7 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                     if (Pair(key.first, key.second) in shortway || Pair(key.second, key.first) in shortway) {
                         col = Color.Green
                     }
+                    if (!saves.graphMode){
                     drawLine(
                         color = col,
                         start = Offset(
@@ -729,7 +833,21 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                             value.second.second.value - canvasHeight / 2
                         ),
                         strokeWidth = 2f
-                    )
+                    )}
+                    else{
+                        drawArrow(
+                            color = col,
+                            start = Offset(
+                                value.first.first.value - canvasWidth / 2,
+                                value.first.second.value - canvasHeight / 2
+                            ),
+                            end = Offset(
+                                value.second.first.value - canvasWidth / 2,
+                                value.second.second.value - canvasHeight / 2
+                            ),
+                            circleRadius
+                        )
+                    }
                 }
 
                 // Отрисовка кругов
@@ -796,7 +914,6 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                 }
             }
             cyclesFromNode.value = listOf()
-            //nodesInClusters = mapOf()
 
 // Отображаем всплывающее окно, если круг выбран
             selectedCircle?.let { key ->
@@ -815,7 +932,7 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                             Text("Редактирование узла", color = colorStates[4])
                             // вот сюда можно добавить еще всякого полезного, типа настройки веса ребра как нибудь, я не придумал)
                             Button(onClick = {
-                                wgraph.removeNode(key)
+                                graph.removeNode(key)
                                 val listToRemove = mutableListOf<Pair<Int,Int>>()
                                 for ( i in linesToDraw.keys){
                                     if (i.first == key || i.second == key){
@@ -887,10 +1004,11 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
                                 )
                                 )
                             }
-                            saveToFile(circlesToDrawInPixels,
+                            saveToFile(graphMode = saves.graphMode ,circlesToDrawInPixels,
                                 linesToDrawInPixels,
                                 switchState,
-                                nodeCounter)
+                                nodeCounter,
+                                selectedFile)
                             openSettings = false
                         }){
                             Text("Сохранить граф")
@@ -904,41 +1022,82 @@ fun findSCCsInGraph()  :  Map<List<Int>, Color>{
 }
 
 @Composable
-fun mainScreen(onStartClick: () -> Unit) { // стартовое окно с загрузкой или старта с 0
+fun mainScreen(onStartClick: () -> Unit, onFileSelected: (File?) -> Unit, onGraphModeSelected: (Boolean) -> Unit) {
+    var selectedFile by remember { mutableStateOf<File?>(null) }
+    val saveDirectory = File("src/main/resources/save/")
+    var graphMode by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text("Выберите режим графа для создания")
+        Row(verticalAlignment = Alignment.CenterVertically){
+            RadioButton(
+                selected = graphMode,
+                onClick = {
+                    graphMode = true
+                    onGraphModeSelected(true)
+                }
+            )
+            Text("Ориентированный")
+            Spacer(modifier = Modifier.width(16.dp))
+            RadioButton(
+                selected = !graphMode,
+                onClick = {
+                    graphMode = false
+                    onGraphModeSelected(false)
+                }
+            )
+            Text("Неориентированный")
+        }
+
         Button(onClick = onStartClick) {
             Text("Построить граф")
         }
-        Button(onClick = { /* Handle other button click */ }) {
+        Button(onClick = { selectedFile = chooseFile(saveDirectory); onFileSelected(selectedFile) }) {
             Text("Загрузить сохранение")
         }
-
+        selectedFile?.let { file ->
+            onFileSelected(file)
+        }
     }
 }
 
-fun main() = application { // то что запускается и вызывает все остальное
 
+
+fun main() = application {
     val density = LocalDensity.current
     val windowSize = with(density) { DpSize(800.dp.value.toInt().toDp(), 600.dp.value.toInt().toDp()) }
 
     var showMainScreen by remember { mutableStateOf(true) }
+    var selectedFile by remember { mutableStateOf<File?>(null) }
+    var graphMode by remember { mutableStateOf(false) }
 
     if (showMainScreen) {
         Window(onCloseRequest = ::exitApplication) {
-            mainScreen(onStartClick = { showMainScreen = false })
+            mainScreen(
+                onStartClick = { showMainScreen = false },
+                onFileSelected = { file -> selectedFile = file; showMainScreen = false },
+                onGraphModeSelected = { mode -> graphMode = mode }
+            )
         }
     } else {
         Window(
             onCloseRequest = ::exitApplication,
-            state = WindowState(size = windowSize),
-            title = "The best graph visualizer",
+            state = rememberWindowState(size = windowSize),
+            title = "Connect-a-Lot",
             focusable = true
         ) {
-            app()
+            val initialData = if (selectedFile != null) {
+                loadFromFile(selectedFile!!.name)
+            } else {
+                WindowStateData(graphMode = graphMode, circlesToDraw = mapOf(), linesToDraw = mapOf(), switchState = false, nodeCounter = 0)
+            }
+            app(initialData, selectedFile?.name)
         }
     }
 }
