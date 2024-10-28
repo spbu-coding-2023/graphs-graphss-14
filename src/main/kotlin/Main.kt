@@ -214,8 +214,13 @@ fun saveToFile(
             val file = File(directory, newFileName)
             file.writeText(json)
         } else {
-            val file = File(directory, fileName)
-            file.writeText(json)
+            if (".db" in fileName) {
+                val file = File(directory, fileName.substring(0, fileName.length - 3) + ".json")
+                file.writeText(json)
+            } else {
+                val file = File(directory, fileName)
+                file.writeText(json)
+            }
         }
     }
     if (flag == 2) {
@@ -283,7 +288,7 @@ fun loadFromFile(fileName: String): WindowStateData {
         jsonContent = file.readText()
     }
     if (".db" in fileName) {
-        val url = "jdbc:sqlite:" + directory + "\\" + fileName
+        val url = "jdbc:sqlite:" + directory + "/" + fileName
         println(url)
         val conn = DriverManager.getConnection(url)
         val stmt = conn.createStatement()
@@ -1141,7 +1146,7 @@ fun app(savesData: WindowStateData, selectedFile: String?) {
             title = "settings",
             state = WindowState(
                 position = WindowPosition(windowWidth / 2, windowHeight / 2),
-                size = DpSize(200.dp, 200.dp)
+                size = DpSize(300.dp, 300.dp)
             ),
             content = {
                 Box(
@@ -1218,7 +1223,7 @@ fun app(savesData: WindowStateData, selectedFile: String?) {
                             )
                             openSettings = false
                         }) {
-                            Text("Сохранить граф в .dp")
+                            Text("Сохранить граф в .bd")
                         }
                     }
                 }
