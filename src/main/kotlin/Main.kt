@@ -245,7 +245,7 @@ fun saveToFile(
                 val newFileName = fileName.substring(0, fileName.length - 5)
                 url = "jdbc:sqlite:src/main/resources/save/$newFileName.db"
             } else {
-                url = "jdbc:sqlite:src/main/resources/save//$fileName"
+                url = "jdbc:sqlite:src/main/resources/save/$fileName"
             }
         }
         val conn = DriverManager.getConnection(url)
@@ -1223,7 +1223,7 @@ fun app(savesData: WindowStateData, selectedFile: String?) {
                             )
                             openSettings = false
                         }) {
-                            Text("Сохранить граф в .bd")
+                            Text("Сохранить граф в .db")
                         }
                     }
                 }
