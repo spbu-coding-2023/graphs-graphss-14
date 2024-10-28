@@ -42,8 +42,10 @@ import kotlinx.serialization.json.*
 import java.io.File
 import java.awt.FileDialog
 import java.awt.Frame
+import java.sql.DriverManager
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import kotlin.math.roundToInt
 
 fun DrawScope.drawArrow(color: Color, start: Offset, end: Offset, n: Dp) {
     val arrowHeadSize = 10.dp.toPx()
@@ -88,6 +90,58 @@ fun DrawScope.drawArrow(color: Color, start: Offset, end: Offset, n: Dp) {
     )
 }
 
+fun generateDistinctColors(n: Int): List<Color> {
+    val colors = mutableListOf<Color>()
+    val hueStep = 360.0 / n
+
+    for (i in 0 until n) {
+        val hue = (i * hueStep).roundToInt()
+        val color = hslToColor(hue, 100, 50)
+        colors.add(color)
+    }
+
+    return colors
+}
+
+fun hslToColor(h: Int, s: Int, l: Int): Color {
+    val h = h / 360.0
+    val s = s / 100.0
+    val l = l / 100.0
+
+    val q = if (l < 0.5) l * (1 + s) else l + s - l * s
+    val p = 2 * l - q
+
+    val r = (hueToRgb(p, q, h + 1.0 / 3) * 255).roundToInt()
+    val g = (hueToRgb(p, q, h) * 255).roundToInt()
+    val b = (hueToRgb(p, q, h - 1.0 / 3) * 255).roundToInt()
+
+    return Color(r, g, b)
+}
+
+fun hueToRgb(p: Double, q: Double, t: Double): Double {
+    var t = t
+    if (t < 0) t += 1
+    if (t > 1) t -= 1
+    if (t < 1.0 / 6) return p + (q - p) * 6 * t
+    if (t < 1.0 / 2) return q
+    if (t < 2.0 / 3) return p + (q - p) * (2.0 / 3 - t) * 6
+    return p
+}
+
+fun communityColoring(mp: MutableMap<Int, Int>): MutableMap<Int, Color> {
+    val s: MutableSet<Int> = mutableSetOf()
+    for (i in mp.keys) {
+        s.add(mp[i]!!)
+    }
+    val colors = generateDistinctColors(s.size)
+    val res: MutableMap<Int, Color> = mutableMapOf()
+    val comToCol = s.zip(colors).toMap()
+    for (i in mp.keys) {
+        res[i] = comToCol[mp[i]!!]!!
+    }
+    return res
+}
+
 fun Float.toDp(density: Density): Dp {
     return with(density) { this@toDp.toDp() }
 }
@@ -106,6 +160,7 @@ fun findInMap(dict: MutableMap<Int, Pair<Dp, Dp>>, circleRadius: Dp, offset: Off
     }
     return null
 }
+
 // Класс для отслеживания дейсивий пользователя для отмены (1 значение - код действия, 2 - прилагающиеся данные)
 data class Action(val type: Int, val data: Any?)
 
@@ -123,8 +178,8 @@ data class CircleData(
 //инфа про текущее состояние графа (для сохранения) (можно добавить еще какой-то инфы)
 @Serializable
 data class WindowStateData(
-    val graphMode : Boolean,
-    val circlesToDraw: Map<Int,CircleData>,
+    val graphMode: Boolean,
+    val circlesToDraw: Map<Int, CircleData>,
     val linesToDraw: Map<Pair<Int, Int>, Pair<CircleData, CircleData>>,
     val switchState: Boolean,
     val nodeCounter: Int
@@ -137,30 +192,68 @@ fun saveToFile(
     linesToDraw: Map<Pair<Int, Int>, Pair<CircleData, CircleData>>,
     switchState: Boolean,
     nodeCounter: Int,
-    fileName : String?
+    fileName: String?,
+    flag: Int
 ) {
-    val data = WindowStateData(graphMode, circlesToDraw, linesToDraw, switchState, nodeCounter)
-    val json = Json{
-        allowStructuredMapKeys = true
-    }.
-    encodeToString(value = data)
-    val directory = File("src/main/resources/save/")
-    directory.mkdirs()
+    if (flag == 1) {
+        val data = WindowStateData(graphMode, circlesToDraw, linesToDraw, switchState, nodeCounter)
+        val json = Json {
+            allowStructuredMapKeys = true
+        }.encodeToString(value = data)
+        val directory = File("src/main/resources/save/")
+        directory.mkdirs()
 
-    if (fileName == null) {
-        // Получаем текущее время
-        val currentTime = LocalDateTime.now()
-        // Форматируем время в строку
-        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
-        val formattedTime = currentTime.format(formatter)
+        if (fileName == null) {
+            // Получаем текущее время
+            val currentTime = LocalDateTime.now()
+            // Форматируем время в строку
+            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
+            val formattedTime = currentTime.format(formatter)
 
-        val newFileName = "$formattedTime.json"
-        val file = File(directory, newFileName)
-        file.writeText(json)
+            val newFileName = "$formattedTime.json"
+            val file = File(directory, newFileName)
+            file.writeText(json)
+        } else {
+            val file = File(directory, fileName)
+            file.writeText(json)
+        }
     }
-    else{
-        val file = File(directory, fileName)
-        file.writeText(json)
+    if (flag == 2) {
+        val data = WindowStateData(graphMode, circlesToDraw, linesToDraw, switchState, nodeCounter)
+        val json = Json {
+            allowStructuredMapKeys = true
+        }.encodeToString(value = data)
+        val directory = File("src/main/resources/save/")
+        directory.mkdirs()
+        var url: String
+        if (fileName == null) {
+            val currentTime = LocalDateTime.now()
+            // Форматируем время в строку
+            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
+            val formattedTime = currentTime.format(formatter)
+
+            val newFileName = "$formattedTime.db"
+            val file = File(directory, newFileName)
+            url = "jdbc:sqlite:src/main/resources/save/$newFileName"
+        } else {
+            if (".json" in fileName) {
+                val newFileName = fileName.substring(0, fileName.length - 5)
+                url = "jdbc:sqlite:src/main/resources/save/$newFileName.db"
+            } else {
+                url = "jdbc:sqlite:src/main/resources/save//$fileName"
+            }
+        }
+        val conn = DriverManager.getConnection(url)
+        val stmt = conn.createStatement()
+        val sql = ("CREATE TABLE IF NOT EXISTS graph ("
+                + "	json text"
+                + ");");
+        stmt.execute(sql)
+        val sql1 = "INSERT INTO graph(json) VALUES(?)"
+        val pstmt = conn.prepareStatement(sql1)
+        pstmt.setString(1, json)
+        pstmt.executeUpdate()
+        conn.close()
     }
 }
 
@@ -168,7 +261,7 @@ fun chooseFile(initialDirectory: File): File? {
     val fileDialog = FileDialog(Frame(), "Выберите файл", FileDialog.LOAD)
     fileDialog.isMultipleMode = false
     fileDialog.directory = initialDirectory.absolutePath
-    fileDialog.file = "*.json" // Фильтр для отображения только JSON файлов
+    fileDialog.file = "*.db;*.json"
     fileDialog.isVisible = true
 
     return if (fileDialog.file != null) {
@@ -185,12 +278,28 @@ fun loadFromFile(fileName: String): WindowStateData {
     if (!file.exists()) {
         throw IllegalArgumentException("File not found: $fileName")
     }
-
-    val jsonContent = file.readText()
+    var jsonContent: String = ""
+    if (".json" in fileName) {
+        jsonContent = file.readText()
+    }
+    if (".db" in fileName) {
+        val url = "jdbc:sqlite:" + directory + "\\" + fileName
+        println(url)
+        val conn = DriverManager.getConnection(url)
+        val stmt = conn.createStatement()
+        val r = "SELECT json\n" +
+                "FROM graph\n" +
+                "ORDER BY ROWID DESC\n" +
+                "LIMIT 1;"
+        val res = stmt.executeQuery(r)
+        jsonContent = res.getString("json")
+        conn.close()
+    }
     return Json {
         allowStructuredMapKeys = true
     }.decodeFromString(jsonContent)
 }
+
 //отладочная информация в консоль (вместо отладочных принтов)
 private val logger = KotlinLogging.logger {}
 
@@ -198,7 +307,7 @@ private val logger = KotlinLogging.logger {}
 //основной код
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun app(savesData : WindowStateData, selectedFile: String?) {
+fun app(savesData: WindowStateData, selectedFile: String?) {
     val firstTime = remember { mutableStateOf(true) }
     val saves by remember { mutableStateOf(savesData) }
     // Вся инфа которую нужно хранить
@@ -209,17 +318,19 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
     var windowWidth by remember { mutableStateOf(windowState.size.width) }
     var circlesToDraw by remember { mutableStateOf(mutableMapOf<Int, Pair<Dp, Dp>>()) }
     var colorsForBeetweenes by remember { mutableStateOf(mapOf<Int, Float>()) }
+    var louvainCommunity by remember { mutableStateOf(mapOf<Int, Color>()) }
     var linesToDraw by remember { mutableStateOf(mutableMapOf<Pair<Int, Int>, Pair<Pair<Dp, Dp>, Pair<Dp, Dp>>>()) }
-    var graph by remember { mutableStateOf( WGraph()) }
+    var graph by remember { mutableStateOf(WGraph()) }
 
+    var louvainFlag by remember { mutableStateOf(false) }
 
     val bridges = remember { mutableStateOf(listOf<Pair<Int, Int>>()) }
     val isNodesToFindWay = remember { mutableStateOf(false) }
     val isNodesToFindWayD = remember { mutableStateOf(false) }
     val shortestWay = remember { mutableStateOf(listOf<Int>()) }
-    val cyclesFromNode  = remember { mutableStateOf(listOf<List<Int>>()) }
-    var isCyclesFromNode  by remember { mutableStateOf(false) }
-    var isNodesClustering  by remember { mutableStateOf(false) }
+    val cyclesFromNode = remember { mutableStateOf(listOf<List<Int>>()) }
+    var isCyclesFromNode by remember { mutableStateOf(false) }
+    var isNodesClustering by remember { mutableStateOf(false) }
     var nodesInClusters by remember { mutableStateOf(mapOf<Int, Float>()) }
 
     var selectedCircle by remember { mutableStateOf<Int?>(null) }
@@ -234,13 +345,15 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
     var additionalOptionsGroup3 by remember { mutableStateOf(false) }
     var openSettings by remember { mutableStateOf(false) }
     var isColorsForBeetweenes by remember { mutableStateOf(false) }
-    var sccs by remember {mutableStateOf(mapOf<List<Int>, Color>())}
+    var sccs by remember { mutableStateOf(mapOf<List<Int>, Color>()) }
     var switchState by remember { mutableStateOf(false) }
     var turnBack by remember { mutableStateOf(false) }
-    var iconStates by remember { mutableStateOf( false) }
-    var sccsFlag by remember { mutableStateOf( false) }
+    var iconStates by remember { mutableStateOf(false) }
+    var sccsFlag by remember { mutableStateOf(false) }
+    var spanningTreeFlag by remember { mutableStateOf(false) }
+    var spanningTreeEdges by remember { mutableStateOf(mutableListOf<Pair<Int, Int>>()) }
     val scaleFactor = windowHeight / 600.dp
-    
+
     val colorStates by remember { // цвет темы
         mutableStateOf(
             mutableListOf(
@@ -252,7 +365,8 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
             )
         )
     }
-    fun findSCCsInGraph()  :  Map<List<Int>, Color>{
+
+    fun findSCCsInGraph(): Map<List<Int>, Color> {
         val diGraph = DiGraph()
         circlesToDraw.keys.forEach { diGraph.addNode(it) }
         linesToDraw.keys.forEach { diGraph.addEdge(it.first, it.second) }
@@ -261,13 +375,15 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
         logger.info { "Nodes: ${diGraph.nodes}" }
         logger.info { "Edges: ${diGraph.edges}" }
 
-        val sccst = diGraph.findSCCs().filter{it.size > 1}.sortedBy { it.size }.associateWith { Color(
-            Random.nextInt(50, 200),
-            Random.nextInt(50, 200),
-            Random.nextInt(50, 200)
-        )}
+        val sccst = diGraph.findSCCs().filter { it.size > 1 }.sortedBy { it.size }.associateWith {
+            Color(
+                Random.nextInt(50, 200),
+                Random.nextInt(50, 200),
+                Random.nextInt(50, 200)
+            )
+        }
 
-        logger.info {"SCCs: ${sccst.keys}"}
+        logger.info { "SCCs: ${sccst.keys}" }
         return sccst
     }
 
@@ -292,10 +408,10 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
     var selectedOption by remember { mutableStateOf(1) }
     var nodeCounter by remember { mutableStateOf(0) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
-    
-    if (firstTime.value){
-        if(saves.graphMode) {
-            graph =  DiGraph()
+
+    if (firstTime.value) {
+        if (saves.graphMode) {
+            graph = DiGraph()
         }
         switchState = saves.switchState
         nodeCounter = saves.nodeCounter
@@ -303,9 +419,11 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
             circlesToDraw[key] = Pair(data.x.toDp(density), data.y.toDp(density))
             graph.addNode(key)
         }
-        saves.linesToDraw.forEach{(key, data) ->
-            linesToDraw[key] = Pair(Pair(data.first.x.toDp(density), data.first.y.toDp(density)),
-                Pair(data.second.x.toDp(density), data.second.y.toDp(density)))
+        saves.linesToDraw.forEach { (key, data) ->
+            linesToDraw[key] = Pair(
+                Pair(data.first.x.toDp(density), data.first.y.toDp(density)),
+                Pair(data.second.x.toDp(density), data.second.y.toDp(density))
+            )
             graph.addEdge(key.first, key.second, 1)
 
         }
@@ -327,6 +445,8 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                 additionalOptionsGroup1 = false
                 additionalOptionsGroup2 = false
                 additionalOptionsGroup3 = false
+                louvainFlag = false
+                spanningTreeFlag = false
                 bridges.value = listOf()
                 shortestWay.value = listOf()
 
@@ -367,7 +487,7 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                         expanded = false
                         isNodesToFindWayD.value = true
                         additionalOptionsGroup1 = false
-                    }){
+                    }) {
                         Text("Дейкстра", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
                     DropdownMenuItem(onClick = {
@@ -409,19 +529,23 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                         expanded = false
                         additionalOptionsGroup1 = false
                     }) {// название поменять, на название алгоритма
-                        Text("Spring Embedder (Раскладка графа)", color = colorStates[4], fontSize = 12.sp * scaleFactor)
+                        Text(
+                            "Spring Embedder (Раскладка графа)",
+                            color = colorStates[4],
+                            fontSize = 12.sp * scaleFactor
+                        )
                     }
                     DropdownMenuItem(onClick = {
                         logger.info { "Additional Option 2 clicked" }
-                        colorsForBeetweenes = graph.betweennessCentrality()
-                        logger.info { colorsForBeetweenes }
+                        louvainCommunity = communityColoring(graph.LouvainAlgorithm())
+                        logger.info { louvainCommunity }
 
-                        isColorsForBeetweenes = true
+                        louvainFlag = true
                         expanded = false
                         additionalOptionsGroup1 = false
 
                     }) {
-                        Text("Выделение сообществ (не работает)", color = colorStates[4], fontSize = 12.sp * scaleFactor)
+                        Text("Выделение сообществ", color = colorStates[4], fontSize = 12.sp * scaleFactor)
                     }
                 }
                 DropdownMenuItem(onClick = {
@@ -438,8 +562,13 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                         expanded = false
                         additionalOptionsGroup2 = false
                         sccs = findSCCsInGraph()
-                        sccsFlag = true }) {
-                        Text("Выделение компонент сильной связности", color = colorStates[4], fontSize = 12.sp * scaleFactor)
+                        sccsFlag = true
+                    }) {
+                        Text(
+                            "Выделение компонент сильной связности",
+                            color = colorStates[4],
+                            fontSize = 12.sp * scaleFactor
+                        )
                     }
                     DropdownMenuItem(onClick = { //выделение сообществ
                         logger.info { "Additional Option 3 clicked" }
@@ -467,15 +596,26 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                         selectedOption = 0
 
                     }) {
-                        Text("Поиск циклов для заданной вершины", color = colorStates[4], fontSize = 12.sp * scaleFactor)
+                        Text(
+                            "Поиск циклов для заданной вершины",
+                            color = colorStates[4],
+                            fontSize = 12.sp * scaleFactor
+                        )
                     }
                     DropdownMenuItem(onClick = { // мин. остовное дерево (сделать!) Это пусть тоже Олег делает
                         logger.info { "Additional Option 1 clicked" }
                         expanded = false
                         additionalOptionsGroup3 = false
                         selectedOption = 0
+                        spanningTreeFlag = true
+                        spanningTreeEdges = graph.getSpanningTree().edges
+                        logger.info { spanningTreeEdges }
                     }) {
-                        Text("Построение минимального остовного дерева (не работает)", color = colorStates[4], fontSize = 12.sp * scaleFactor)
+                        Text(
+                            "Построение минимального остовного дерева",
+                            color = colorStates[4],
+                            fontSize = 12.sp * scaleFactor
+                        )
                     }
                 }
 
@@ -496,7 +636,12 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                     selectedColor = Color.Cyan // Цвет активного радиобаттона
                 )
             )
-            Text("Создать узлы", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4], fontSize = 12.sp * scaleFactor)
+            Text(
+                "Создать узлы",
+                modifier = Modifier.align(Alignment.CenterVertically),
+                color = colorStates[4],
+                fontSize = 12.sp * scaleFactor
+            )
 
             RadioButton(
                 selected = selectedOption == 2, // соединение
@@ -507,7 +652,12 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                 )
 
             )
-            Text("Соединить узлы", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4], fontSize = 12.sp * scaleFactor)
+            Text(
+                "Соединить узлы",
+                modifier = Modifier.align(Alignment.CenterVertically),
+                color = colorStates[4],
+                fontSize = 12.sp * scaleFactor
+            )
 
             RadioButton( // это редактирование узлов
                 selected = selectedOption == 4,
@@ -517,7 +667,12 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                     selectedColor = Color.Cyan // Цвет активного радиобаттона
                 )
             )
-            Text("Редактировать", modifier = Modifier.align(Alignment.CenterVertically), color = colorStates[4], fontSize = 12.sp * scaleFactor)
+            Text(
+                "Редактировать",
+                modifier = Modifier.align(Alignment.CenterVertically),
+                color = colorStates[4],
+                fontSize = 12.sp * scaleFactor
+            )
 
             IconButton(onClick = { // Отмена
                 turnBack = true
@@ -552,12 +707,12 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                             graph.removeEdge(start as Int, end as Int)
                         }
 
-                        3 ->{ // отмена передвижения
-                            val (key, pos,lines) = lastAction.data as Triple<Int,Pair<Dp,Dp>,List<Pair<Int,Int>>>
+                        3 -> { // отмена передвижения
+                            val (key, pos, lines) = lastAction.data as Triple<Int, Pair<Dp, Dp>, List<Pair<Int, Int>>>
                             circlesToDraw[key] = pos
                             graph.addNode(key)
-                            for (i in lines){
-                                graph.addEdge(i.first,i.second, 1)
+                            for (i in lines) {
+                                graph.addEdge(i.first, i.second, 1)
                                 linesToDraw[i] = Pair(circlesToDraw[i.first]!!, circlesToDraw[i.second]!!)
                             }
                         }
@@ -590,12 +745,12 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                                 graph.removeEdge(start as Int, end as Int)
                             }
 
-                            3 ->{
-                                val (key, pos,lines) = lastAction.data as Triple<Int,Pair<Dp,Dp>,List<Pair<Int,Int>>>
+                            3 -> {
+                                val (key, pos, lines) = lastAction.data as Triple<Int, Pair<Dp, Dp>, List<Pair<Int, Int>>>
                                 circlesToDraw[key] = pos
                                 graph.addNode(key)
-                                for (i in lines){
-                                    graph.addEdge(i.first,i.second, 1)
+                                for (i in lines) {
+                                    graph.addEdge(i.first, i.second, 1)
                                     linesToDraw[i] = Pair(circlesToDraw[i.first]!!, circlesToDraw[i.second]!!)
                                 }
                             }
@@ -624,13 +779,14 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                     openSettings = false
                     bridges.value = listOf()
                     isColorsForBeetweenes = false
+                    louvainFlag = false
+                    spanningTreeFlag = false
                     shortestWay.value = listOf()
                     val hitCircle = findInMap(circlesToDraw, circleRadius, offset)
-                    if (hitCircle != null && isCyclesFromNode){
+                    if (hitCircle != null && isCyclesFromNode) {
                         cyclesFromNode.value = graph.findCyclesFromNode(hitCircle)
-                        logger.info {graph.findCyclesFromNode(hitCircle)}
-                    }
-                    else
+                        logger.info { graph.findCyclesFromNode(hitCircle) }
+                    } else
                         isCyclesFromNode = false
                     if (isNodesToFindWay.value || isNodesToFindWayD.value) {
                         if (hitCircle != null) {
@@ -685,7 +841,10 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                                         startConnectingPoint = hitCircle
                                     } else if (endConnectingPoint == null && startConnectingPoint != hitCircle) {
                                         endConnectingPoint = hitCircle
-                                        if ((!(Pair(endConnectingPoint, startConnectingPoint) in linesToDraw && !saves.graphMode)|| Pair(
+                                        if ((!(Pair(
+                                                endConnectingPoint,
+                                                startConnectingPoint
+                                            ) in linesToDraw && !saves.graphMode) || Pair(
                                                 startConnectingPoint,
                                                 endConnectingPoint
                                             ) in linesToDraw)
@@ -703,7 +862,7 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                                                         circlesToDraw[endConnectingPoint]!!
                                                     )
                                             }
-                                            graph.addEdge(startConnectingPoint!!,endConnectingPoint!!, 1)
+                                            graph.addEdge(startConnectingPoint!!, endConnectingPoint!!, 1)
 
                                         }
                                         startConnectingPoint = null
@@ -722,7 +881,7 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                     }
                 })
             }
-                .onSizeChanged { newSize -> // обработка изменения размеров приложения
+            .onSizeChanged { newSize -> // обработка изменения размеров приложения
                 val temp = with(density) { DpSize(newSize.width.toDp(), newSize.height.toDp()) }
                 if (temp != windowSize) {
                     windowSize = temp
@@ -812,7 +971,12 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                 }
                 for ((key, value) in linesToDraw) {
                     var col = colorStates[4]
-                    if (key in allPairs || Pair(key.second, key.first) in allPairs){
+                    if (spanningTreeFlag) {
+                        if (key in spanningTreeEdges || Pair(key.second, key.first) in spanningTreeEdges) {
+                            col = Color.Green
+                        }
+                    }
+                    if (key in allPairs || Pair(key.second, key.first) in allPairs) {
                         col = Color.Magenta
                     }
                     if (Pair(key.first, key.second) in bridges.value || Pair(key.second, key.first) in bridges.value) {
@@ -821,20 +985,20 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                     if (Pair(key.first, key.second) in shortway || Pair(key.second, key.first) in shortway) {
                         col = Color.Green
                     }
-                    if (!saves.graphMode){
-                    drawLine(
-                        color = col,
-                        start = Offset(
-                            value.first.first.value - canvasWidth / 2,
-                            value.first.second.value - canvasHeight / 2
-                        ),
-                        end = Offset(
-                            value.second.first.value - canvasWidth / 2,
-                            value.second.second.value - canvasHeight / 2
-                        ),
-                        strokeWidth = 2f
-                    )}
-                    else{
+                    if (!saves.graphMode) {
+                        drawLine(
+                            color = col,
+                            start = Offset(
+                                value.first.first.value - canvasWidth / 2,
+                                value.first.second.value - canvasHeight / 2
+                            ),
+                            end = Offset(
+                                value.second.first.value - canvasWidth / 2,
+                                value.second.second.value - canvasHeight / 2
+                            ),
+                            strokeWidth = 2f
+                        )
+                    } else {
                         drawArrow(
                             color = col,
                             start = Offset(
@@ -854,21 +1018,27 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                 val uniqueVertices = cyclesFromNode.value.flatten().toSet()
                 for ((key, value) in circlesToDraw) {
                     var col = colorStates[1]
-                    if (isNodesClustering){
+
+                    if (louvainFlag) {
+                        col = louvainCommunity[key]!!
+                    }
+
+                    if (isNodesClustering) {
                         val maxValue = nodesInClusters.values.maxOf { it }
                         val onePartValue = maxValue / 200
-                        col = Color(red = min((75F + nodesInClusters[key]!! / onePartValue).toInt(), 255),
+                        col = Color(
+                            red = min((75F + nodesInClusters[key]!! / onePartValue).toInt(), 255),
                             min((10F + nodesInClusters[key]!! / onePartValue).toInt(), 255),
-                            min((10F + nodesInClusters[key]!! / onePartValue).toInt(), 255))
+                            min((10F + nodesInClusters[key]!! / onePartValue).toInt(), 255)
+                        )
                     }
-                    if (isCyclesFromNode && cyclesFromNode.value.isNotEmpty()){
-                        if (key in uniqueVertices){
+                    if (isCyclesFromNode && cyclesFromNode.value.isNotEmpty()) {
+                        if (key in uniqueVertices) {
                             col = Color.Blue
                         }
                         if (key == cyclesFromNode.value.first()[0])
                             col = Color.Cyan
-                    }
-                    else if (shortestWay.value.isNotEmpty() && (key == shortestWay.value.first() || key == shortestWay.value.last())) {
+                    } else if (shortestWay.value.isNotEmpty() && (key == shortestWay.value.first() || key == shortestWay.value.last())) {
                         col = Color.Cyan
                     } else if (key in shortestWay.value) {
                         col = Color.Blue
@@ -886,7 +1056,8 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                             radius = circleRadius.value + 1,
                             center = Offset(
                                 value.first.value - canvasWidth / 2,
-                                value.second.value - canvasHeight / 2),
+                                value.second.value - canvasHeight / 2
+                            ),
                             style = Stroke(width = 2.dp.toPx())
                         )
                     } // если придумаешь как делать текст на кружочках будешь крутым (я не смог)
@@ -895,9 +1066,9 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                     //)
 
                 }
-                if (sccsFlag){
+                if (sccsFlag) {
                     sccs.keys.forEach { scc ->
-                        val rColor= sccs[scc]!!
+                        val rColor = sccs[scc]!!
                         scc.forEach { node ->
                             val position = circlesToDraw[node]!!
                             drawCircle(
@@ -933,22 +1104,23 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                             // вот сюда можно добавить еще всякого полезного, типа настройки веса ребра как нибудь, я не придумал)
                             Button(onClick = {
                                 graph.removeNode(key)
-                                val listToRemove = mutableListOf<Pair<Int,Int>>()
-                                for ( i in linesToDraw.keys){
-                                    if (i.first == key || i.second == key){
+                                val listToRemove = mutableListOf<Pair<Int, Int>>()
+                                for (i in linesToDraw.keys) {
+                                    if (i.first == key || i.second == key) {
                                         listToRemove.add(i)
                                     }
                                 }
-                                for (i in listToRemove){
+                                for (i in listToRemove) {
                                     linesToDraw.remove(i)
                                 }
-                                actionStack.add(Action(
-                                    3,
-                                    Triple(key,circlesToDraw[key] ,listToRemove)
-                                ))
+                                actionStack.add(
+                                    Action(
+                                        3,
+                                        Triple(key, circlesToDraw[key], listToRemove)
+                                    )
+                                )
                                 circlesToDraw.remove(key)
                                 selectedCircle = null
-
 
 
                                 //linesToDraw = newLinesToDraw as MutableMap<Pair<Int, Int>, Pair<Pair<Dp, Dp>, Pair<Dp, Dp>>>
@@ -995,23 +1167,58 @@ fun app(savesData : WindowStateData, selectedFile: String?) {
                                 )
                             }
                             val linesToDrawInPixels = linesToDraw.mapValues { (_, position) ->
-                                Pair(CircleData(
-                                    x = position.first.first.toPixels(density),
-                                    y = position.first.second.toPixels(density)
-                                ), CircleData(
-                                    x = position.second.first.toPixels(density),
-                                    y = position.second.second.toPixels(density)
-                                )
+                                Pair(
+                                    CircleData(
+                                        x = position.first.first.toPixels(density),
+                                        y = position.first.second.toPixels(density)
+                                    ), CircleData(
+                                        x = position.second.first.toPixels(density),
+                                        y = position.second.second.toPixels(density)
+                                    )
                                 )
                             }
-                            saveToFile(graphMode = saves.graphMode ,circlesToDrawInPixels,
+                            saveToFile(
+                                graphMode = saves.graphMode,
+                                circlesToDrawInPixels,
                                 linesToDrawInPixels,
                                 switchState,
                                 nodeCounter,
-                                selectedFile)
+                                selectedFile,
+                                flag = 1
+                            )
                             openSettings = false
-                        }){
-                            Text("Сохранить граф")
+                        }) {
+                            Text("Сохранить граф в .json")
+                        }
+                        Button(onClick = {
+                            val circlesToDrawInPixels = circlesToDraw.mapValues { (_, position) ->
+                                CircleData(
+                                    x = position.first.toPixels(density),
+                                    y = position.second.toPixels(density),
+                                )
+                            }
+                            val linesToDrawInPixels = linesToDraw.mapValues { (_, position) ->
+                                Pair(
+                                    CircleData(
+                                        x = position.first.first.toPixels(density),
+                                        y = position.first.second.toPixels(density)
+                                    ), CircleData(
+                                        x = position.second.first.toPixels(density),
+                                        y = position.second.second.toPixels(density)
+                                    )
+                                )
+                            }
+                            saveToFile(
+                                graphMode = saves.graphMode, circlesToDrawInPixels,
+                                linesToDrawInPixels,
+                                switchState,
+                                nodeCounter,
+                                selectedFile,
+                                flag = 2
+                            )
+                            openSettings = false
+                        }) {
+                            Text("Сохранить граф в .dp")
                         }
                     }
                 }
@@ -1035,7 +1242,7 @@ fun mainScreen(onStartClick: () -> Unit, onFileSelected: (File?) -> Unit, onGrap
         Spacer(modifier = Modifier.height(16.dp))
 
         Text("Выберите режим графа для создания")
-        Row(verticalAlignment = Alignment.CenterVertically){
+        Row(verticalAlignment = Alignment.CenterVertically) {
             RadioButton(
                 selected = graphMode,
                 onClick = {
@@ -1068,7 +1275,6 @@ fun mainScreen(onStartClick: () -> Unit, onFileSelected: (File?) -> Unit, onGrap
 }
 
 
-
 fun main() = application {
     val density = LocalDensity.current
     val windowSize = with(density) { DpSize(800.dp.value.toInt().toDp(), 600.dp.value.toInt().toDp()) }
@@ -1095,7 +1301,13 @@ fun main() = application {
             val initialData = if (selectedFile != null) {
                 loadFromFile(selectedFile!!.name)
             } else {
-                WindowStateData(graphMode = graphMode, circlesToDraw = mapOf(), linesToDraw = mapOf(), switchState = false, nodeCounter = 0)
+                WindowStateData(
+                    graphMode = graphMode,
+                    circlesToDraw = mapOf(),
+                    linesToDraw = mapOf(),
+                    switchState = false,
+                    nodeCounter = 0
+                )
             }
             app(initialData, selectedFile?.name)
         }
